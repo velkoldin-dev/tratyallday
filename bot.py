@@ -51,7 +51,7 @@ CATEGORIES = [
 
 def get_today_date():
     """Возвращает сегодняшнюю дату в формате день.месяц по GMT+3"""
-    moscow_time = datetime.utcnow() + timedelta(hours=config.TIMEZONE_OFFSET)
+    moscow_time = datetime.utcnow() + timedelta(hours=TIMEZONE_OFFSET)
     return moscow_time.strftime("%d.%m")
 
 def save_expense_to_csv(date, amount, category):
@@ -83,7 +83,7 @@ def save_expense_to_csv(date, amount, category):
 
 def get_yesterday_date():
     """Возвращает вчерашнюю дату в формате день.месяц по GMT+3"""
-    moscow_time = datetime.utcnow() + timedelta(hours=config.TIMEZONE_OFFSET)
+    moscow_time = datetime.utcnow() + timedelta(hours=TIMEZONE_OFFSET)
     yesterday = moscow_time - timedelta(days=1)
     return yesterday.strftime("%d.%m")
 
