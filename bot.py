@@ -148,13 +148,13 @@ def send_to_google_form(date, amount, category):
         
         # Подготавливаем данные для отправки
         form_data = {
-            config.ENTRY_DATE: date,
-            config.ENTRY_AMOUNT: f"{amount:.2f}",
-            config.ENTRY_CATEGORY: clean_category
+            ENTRY_DATE: date,
+            ENTRY_AMOUNT: f"{amount:.2f}",
+            ENTRY_CATEGORY: clean_category
         }
         
         # Отправляем POST-запрос к Google Form
-        response = requests.post(config.FORM_URL, data=form_data)
+        response = requests.post(FORM_URL, data=form_data)
         
         # Сохраняем в CSV (для статистики)
         save_expense_to_csv(date, amount, category)
@@ -206,22 +206,6 @@ async def send_daily_report(context: ContextTypes.DEFAULT_TYPE):
         
     except Exception as e:
         logger.error(f"Ошибка при отправке отчета: {e}")
-
-async def setup_daily_scheduler(application: Application):
-    """Настраивает ежедневную отправку отчета"""
-    scheduler = AsyncIOScheduler(timezone="Europe/Moscow")
-    
-    # Отправляем отчет каждый день в 9:00 по Москве
-    scheduler.add_job(
-        send_daily_report,
-        trigger=CronTrigger(hour=9, minute=0, timezone="Europe/Moscow"),
-        args=[application],
-        id="daily_report",
-        name="Ежедневный отчет о тратах"
-    )
-    
-    scheduler.start()
-    logger.info("⏰ Планировщик запущен: отчеты в 9:00 МСК")
 
 # ==================== ОБРАБОТЧИКИ КОМАНД ====================
 
@@ -390,7 +374,7 @@ async def test_report_command(update: Update, context: ContextTypes.DEFAULT_TYPE
         
         # Функция для получения вчерашней даты
         def get_yesterday_date_test():
-            moscow_time = datetime.utcnow() + timedelta(hours=config.TIMEZONE_OFFSET)
+            moscow_time = datetime.utcnow() + timedelta(hours=TIMEZONE_OFFSET)
             yesterday = moscow_time - timedelta(days=1)
             return yesterday.strftime("%d.%m")
         
