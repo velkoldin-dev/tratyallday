@@ -11,7 +11,18 @@ from apscheduler.triggers.cron import CronTrigger
 import os
 import csv
 from collections import defaultdict
-import config
+import os
+
+# Получаем данные из переменных окружения Railway
+BOT_TOKEN = os.environ.get("BOT_TOKEN")
+if not BOT_TOKEN:
+    raise ValueError("❌ Установите BOT_TOKEN в Railway Variables")
+
+TIMEZONE_OFFSET = int(os.environ.get("TIMEZONE_OFFSET", 3))
+FORM_URL = os.environ.get("FORM_URL")
+ENTRY_DATE = os.environ.get("ENTRY_DATE")
+ENTRY_AMOUNT = os.environ.get("ENTRY_AMOUNT")
+ENTRY_CATEGORY = os.environ.get("ENTRY_CATEGORY")
 
 # Настройка логирования
 logging.basicConfig(
