@@ -6,8 +6,6 @@ from telegram.ext import (
     Application, CommandHandler, MessageHandler, 
     ConversationHandler, filters, ContextTypes
 )
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from apscheduler.triggers.cron import CronTrigger
 import os
 import csv
 from collections import defaultdict
