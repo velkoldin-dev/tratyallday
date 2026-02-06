@@ -1,0 +1,5 @@
+# cron.yaml
+jobs:
+  - name: "daily-expense-report"
+    schedule: "0 6 * * *"  # 06:00 UTC = 09:00 MSK
+    command: "python daily_report.py"
