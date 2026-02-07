@@ -1,0 +1,8 @@
+{
+  "cron": {
+    "daily_report": {
+      "schedule": "0 9 * * *",
+      "command": "python daily_report.py"
+    }
+  }
+}
