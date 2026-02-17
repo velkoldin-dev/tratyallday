@@ -11,6 +11,16 @@ import csv
 from collections import defaultdict
 import os
 import sqlite3 
+
+from database import init_database, add_or_update_user, get_all_users
+
+# Настройка логирования
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO
+)
+logger = logging.getLogger(__name__)
+
 # Получаем данные из переменных окружения Railway
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
 if not BOT_TOKEN:
