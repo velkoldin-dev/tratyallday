@@ -473,6 +473,7 @@ def main():
     application.add_handler(CommandHandler("stats", stats_command))
     application.add_handler(CommandHandler("myid", myid_command))
     application.add_handler(CommandHandler("testreport", test_report_command)) 
+    application.add_handler(CommandHandler("users", users_command))
     # Настраиваем ежедневный отчет (запустится через 3 секунды после старта)
     application.job_queue.run_once(
         lambda ctx: setup_daily_scheduler(application),
