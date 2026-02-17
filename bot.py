@@ -449,6 +449,24 @@ async def test_report_command(update: Update, context: ContextTypes.DEFAULT_TYPE
         
     except Exception as e:
         await update.message.reply_text(f"❌ Ошибка: {str(e)}")
+
+async def users_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Показывает список пользователей (только для админа)"""
+    # Проверяем, что это ты
+    if update.effective_user.id != 37888528:
+        await update.message.reply_text("❌ Эта команда только для админа")
+        return
+    
+    users = get_all_users()
+    if not users:
+        await update.message.reply_text("📭 Пользователей пока нет")
+        return
+    
+    message = "👥 *Список пользователей:*\n\n"
+    for user in users:
+        message += f"• {user['first_name']} (@{user['username']}) - `{user['user_id']}`\n"
+    
+    await update.message.reply_text(message, parse_mode='Markdown')
 # ==================== ОСНОВНАЯ ФУНКЦИЯ ====================
 
 def main():
