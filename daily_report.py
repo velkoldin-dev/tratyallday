@@ -10,9 +10,8 @@ from pathlib import Path
 # Добавляем путь к проекту, чтобы импортировать наши модули
 sys.path.append(str(Path(__file__).parent))
 
-# Импортируем функции из базы данных и бота
+# Импортируем ТОЛЬКО функции из базы данных (НЕ импортируем bot.py!)
 from database import get_all_users, get_user_stats, init_database
-from bot import logger  # используем тот же логгер, что и в боте
 
 # Получаем токен из переменных окружения
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
@@ -20,7 +19,7 @@ if not BOT_TOKEN:
     print("❌ Установите BOT_TOKEN в переменные окружения Railway")
     sys.exit(1)
 
-# Настройка логирования для этого файла
+# Настройка логирования для этого файла (СВОЙ логгер, не из bot.py)
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO
