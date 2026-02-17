@@ -97,3 +97,41 @@ def save_expense(user_id, amount, category, date):
         return False
     finally:
         conn.close()
+
+def get_user_stats(user_id, days=1):
+    """Возвращает статистику пользователя за последние N дней"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    # Вычисляем дату N дней назад
+    from datetime import datetime, timedelta
+    target_date = (datetime.now() - timedelta(days=days)).strftime("%d.%m")
+    
+    # Получаем все траты пользователя за период
+    cursor.execute('''
+        SELECT category, SUM(amount) as total
+        FROM expenses
+        WHERE user_id = ? AND date >= ?
+        GROUP BY category
+        ORDER BY total DESC
+    ''', (user_id, target_date))
+    
+    categories = cursor.fetchall()
+    
+    # Общая сумма
+    cursor.execute('''
+        SELECT SUM(amount) as total
+        FROM expenses
+        WHERE user_id = ? AND date >= ?
+    ''', (user_id, target_date))
+    
+    total_row = cursor.fetchone()
+    total = total_row['total'] if total_row and total_row['total'] else 0
+    
+    conn.close()
+    
+    return {
+        'total': total,
+        'categories': [dict(cat) for cat in categories],
+        'has_data': total > 0
+    }
