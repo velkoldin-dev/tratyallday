@@ -141,36 +141,31 @@ def get_yesterday_stats():
             "has_data": False
         }
 
-# ==================== GOOGLE FORM ФУНКЦИИ ====================
+# ==================== ФУНКЦИИ СОХРАНЕНИЯ ====================
 
-def send_to_google_form(date, amount, category):
-    """Отправляет данные в Google Form"""
+def save_expense_to_db(date, amount, category, user_id):
+    """Сохраняет трату в базу данных"""
     try:
         # Убираем эмодзи из категории
         clean_category = category.split(' ', 1)[1] if ' ' in category else category
         
-        # Подготавливаем данные для отправки
-        form_data = {
-            ENTRY_DATE: date,
-            ENTRY_AMOUNT: f"{amount:.2f}",
-            ENTRY_CATEGORY: clean_category
-        }
+        # Сохраняем в БД через нашу функцию
+        success = save_expense(
+            user_id=user_id,
+            amount=amount,
+            category=clean_category,
+            date=date
+        )
         
-        # Отправляем POST-запрос к Google Form
-        response = requests.post(FORM_URL, data=form_data)
-        
-        # Сохраняем в CSV (для статистики)
-        save_expense_to_csv(date, amount, category)
-        
-        if response.status_code == 200:
-            logger.info(f"Данные отправлены в Google Form: {date}, {amount}, {clean_category}")
+        if success:
+            logger.info(f"💰 Данные сохранены в БД: {date}, {amount}, {clean_category}")
             return True
         else:
-            logger.error(f"Ошибка отправки: {response.status_code}")
+            logger.error("❌ Ошибка сохранения в БД")
             return False
             
     except Exception as e:
-        logger.error(f"Ошибка при отправке в Google Form: {e}")
+        logger.error(f"❌ Ошибка при сохранении: {e}")
         return False
 
 # ==================== ЕЖЕДНЕВНЫЙ ОТЧЕТ ====================
