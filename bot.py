@@ -214,6 +214,14 @@ async def send_daily_report(context: ContextTypes.DEFAULT_TYPE):
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик команды /start"""
+    
+    user = update.effective_user
+    add_or_update_user(
+        user_id=user.id,
+        username=user.username,
+        first_name=user.first_name
+    )
+    
     await update.message.reply_text(
         "💰 *Бот учета трат*\n\n"
         "Введите сумму траты (только число, например: 1500.50):",
