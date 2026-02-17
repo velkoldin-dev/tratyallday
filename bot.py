@@ -1,7 +1,7 @@
 import logging
 import requests
-from datetime import datetime, timedelta
-import asyncio  # 👈 ЭТА СТРОКА НОВАЯ
+from datetime import datetime, timedelta, timezone
+import asyncio
 from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove
 from telegram.ext import (
     Application, CommandHandler, MessageHandler, 
