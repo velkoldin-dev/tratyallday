@@ -20,10 +20,6 @@ if not BOT_TOKEN:
     raise ValueError("❌ Установите BOT_TOKEN в Railway Variables")
 
 TIMEZONE_OFFSET = int(os.environ.get("TIMEZONE_OFFSET", 3))
-FORM_URL = os.environ.get("FORM_URL")
-ENTRY_DATE = os.environ.get("ENTRY_DATE")
-ENTRY_AMOUNT = os.environ.get("ENTRY_AMOUNT")
-ENTRY_CATEGORY = os.environ.get("ENTRY_CATEGORY")
 
 # Настройка логирования
 logging.basicConfig(
@@ -264,25 +260,6 @@ async def get_category(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Получаем сегодняшнюю дату
     date_today = get_today_date()
     
-    # Отправляем данные в Google Form (и сохраняем в CSV)
-    success = send_to_google_form(date_today, amount, category)
-    
-    if success:
-        await update.message.reply_text(
-            f"✅ *Запись добавлена!*\n\n"
-            f"📅 Дата: {date_today}\n"
-            f"💸 Сумма: {amount:.2f} руб.\n"
-            f"📂 Категория: {category}\n\n"
-            f"📊 *Данные сохранены в Google Таблицу и локальный файл!*",
-            reply_markup=ReplyKeyboardRemove()
-        )
-    else:
-        await update.message.reply_text(
-            "❌ *Ошибка при сохранении!*\n\n"
-            "Пожалуйста, попробуйте еще раз через некоторое время.",
-            reply_markup=ReplyKeyboardRemove()
-        )
-    
     # Очищаем данные пользователя
     context.user_data.clear()
     
@@ -484,9 +461,9 @@ def main():
     # Запускаем бота
     print("=" * 50)
     print("🤖 Бот учета трат запущен!")
-    print("⏰ Ежедневные отчеты будут приходить в 9:00 по Москве")
-    print("💾 Данные сохраняются в Google Form и локальный файл expenses.csv")
-    print("🆔 Напишите боту /myid чтобы узнать ваш user_id")
+    print("⏰ Ежедневные отчеты будут приходить в 9:00 по Москве или по запросу")
+    print("💾 Данные сохраняются в базу данных")
+    print("🆔 Напишите боту /myid чтобы узнать ваш user_id (вдруг вам интересно)")
     print("=" * 50)
     
     application.run_polling(allowed_updates=Update.ALL_TYPES)
