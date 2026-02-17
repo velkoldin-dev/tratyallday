@@ -256,9 +256,29 @@ async def get_category(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Получаем категорию и сохраняем данные"""
     category = update.message.text
     amount = context.user_data.get('amount', 0)
+    user_id = update.effective_user.id  # 👈 получаем ID пользователя
     
     # Получаем сегодняшнюю дату
     date_today = get_today_date()
+    
+    # 👇 СОХРАНЯЕМ В БД
+    success = save_expense_to_db(date_today, amount, category, user_id)
+    
+    # 👇 ОТВЕЧАЕМ ПОЛЬЗОВАТЕЛЮ
+    if success:
+        await update.message.reply_text(
+            f"✅ Запись добавлена!\n\n"
+            f"📅 Дата: {date_today}\n"
+            f"💸 Сумма: {amount:.2f} руб.\n"
+            f"📂 Категория: {category}",
+            reply_markup=ReplyKeyboardRemove()
+        )
+    else:
+        await update.message.reply_text(
+            "❌ Ошибка при сохранении!\n\n"
+            "Пожалуйста, попробуйте еще раз.",
+            reply_markup=ReplyKeyboardRemove()
+        )
     
     # Очищаем данные пользователя
     context.user_data.clear()
