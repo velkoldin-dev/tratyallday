@@ -325,7 +325,6 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "3. Бот автоматически сохранит данные\n\n"
         "*Ежедневные отчеты:*\n"
         "📨 Каждый день в 9:00 (МСК) бот пришлет отчет о вчерашних тратах",
-        parse_mode='Markdown'
     )
 
 async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
