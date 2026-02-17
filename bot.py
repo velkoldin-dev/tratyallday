@@ -284,14 +284,19 @@ def main():
     )
     
     # Диалог добавления трат
-    conv_handler = ConversationHandler(
-        entry_points=[CommandHandler('start', start)],
-        states={
-            AMOUNT: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_amount)],
-            CATEGORY: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_category)],
-        },
-        fallbacks=[CommandHandler('cancel', cancel)],
-    )
+conv_handler = ConversationHandler(
+    entry_points=[CommandHandler('start', start)],
+    states={
+        AMOUNT: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_amount)],
+        CATEGORY: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_category)],
+    },
+    fallbacks=[
+        CommandHandler('cancel', cancel),
+        CommandHandler('help', help_command),  # ✅ Добавлено
+        CommandHandler('stats', stats_command),  # ✅ Добавлено
+        CommandHandler('myid', myid_command),  # ✅ Добавлено
+    ],
+)
     
     # Регистрация обработчиков
     application.add_handler(conv_handler)
