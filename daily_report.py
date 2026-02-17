@@ -1,106 +1,118 @@
-# daily_report.py - отдельный файл для отправки отчета
+# daily_report.py - отдельный файл для отправки ежедневных отчетов всем пользователям
 import os
 import sys
-import requests
+import asyncio
+import logging
 from datetime import datetime, timedelta
-import csv
-from collections import defaultdict
+import requests
+from pathlib import Path
 
-# Получаем переменные из окружения
+# Добавляем путь к проекту, чтобы импортировать наши модули
+sys.path.append(str(Path(__file__).parent))
+
+# Импортируем функции из базы данных и бота
+from database import get_all_users, get_user_stats, init_database
+from bot import logger  # используем тот же логгер, что и в боте
+
+# Получаем токен из переменных окружения
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
-CHAT_ID = os.environ.get("CHAT_ID")  # Ваш user_id из Telegram
-TIMEZONE_OFFSET = int(os.environ.get("TIMEZONE_OFFSET", 3))
+if not BOT_TOKEN:
+    print("❌ Установите BOT_TOKEN в переменные окружения Railway")
+    sys.exit(1)
 
-def get_yesterday_date():
-    """Возвращает вчерашнюю дату"""
-    moscow_time = datetime.utcnow() + timedelta(hours=TIMEZONE_OFFSET)
-    yesterday = moscow_time - timedelta(days=1)
-    return yesterday.strftime("%d.%m")
+# Настройка логирования для этого файла
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO
+)
+logger = logging.getLogger(__name__)
 
-def get_yesterday_stats():
-    """Получает статистику за вчера"""
-    try:
-        date_yesterday = get_yesterday_date()
+async def send_daily_reports():
+    """Отправляет ежедневные отчеты всем пользователям"""
+    
+    logger.info("🚀 Запуск ежедневной рассылки отчетов...")
+    
+    # Инициализируем базу данных (на всякий случай)
+    init_database()
+    
+    # Получаем всех пользователей
+    users = get_all_users()
+    
+    if not users:
+        logger.info("📭 Нет пользователей для рассылки")
+        return
+    
+    logger.info(f"📨 Начинаю рассылку для {len(users)} пользователей")
+    
+    successful = 0
+    failed = 0
+    
+    for user in users:
+        user_id = user['user_id']
+        first_name = user['first_name']
         
-        if not os.path.exists('expenses.csv'):
-            return {"total": 0, "top_category": "Нет трат"}
+        # Получаем статистику за вчера (days=1)
+        stats = get_user_stats(user_id, days=1)
         
-        total = 0
-        category_totals = defaultdict(float)
-        
-        with open('expenses.csv', 'r', encoding='utf-8') as f:
-            reader = csv.reader(f)
-            next(reader)
+        # Формируем сообщение
+        if stats['has_data']:
+            # Берём топ-3 категории
+            top_categories = stats['categories'][:3]
+            categories_text = ""
+            for cat in top_categories:
+                categories_text += f"• {cat['category']}: {cat['total']:.2f} руб.\n"
             
-            for row in reader:
-                if len(row) >= 3 and row[0] == date_yesterday:
-                    try:
-                        amount = float(row[1])
-                        category = row[2]
-                        total += amount
-                        category_totals[category] += amount
-                    except (ValueError, TypeError):
-                        continue
-        
-        top_category = "Нет трат"
-        if category_totals:
-            top_category = max(category_totals.items(), key=lambda x: x[1])[0]
-        
-        return {
-            "date": date_yesterday,
-            "total": total,
-            "top_category": top_category
-        }
-        
-    except Exception as e:
-        print(f"❌ Ошибка: {e}")
-        return {"date": get_yesterday_date(), "total": 0, "top_category": "Ошибка"}
-
-def send_telegram_message():
-    """Отправляет сообщение в Telegram"""
-    try:
-        stats = get_yesterday_stats()
-        
-        if stats["total"] > 0:
+            # Вчерашняя дата для заголовка
+            yesterday = (datetime.now() - timedelta(days=1)).strftime("%d.%m")
+            
             message = (
-                f"☀️ *Доброе утро!*\n\n"
-                f"📊 *Вчера ({stats['date']}) ты потратил:* {stats['total']:.2f} руб.\n"
-                f"🏆 *Больше всего в категории:* {stats['top_category']}\n\n"
+                f"☀️ Доброе утро, {first_name}!\n\n"
+                f"📊 За вчера ({yesterday}) ты потратил: {stats['total']:.2f} руб.\n\n"
+                f"🏆 Топ категории:\n{categories_text}\n"
                 f"Хорошего дня! 💫"
             )
         else:
             message = (
-                f"☀️ *Доброе утро!*\n\n"
-                f"📊 *Вчера ({stats['date']}) у тебя не было трат.*\n\n"
-                f"Отличное начало дня! 🌟"
+                f"☀️ Доброе утро, {first_name}!\n\n"
+                f"📊 Вчера у тебя не было трат.\n"
+                f"Отличный день для экономии! 💪"
             )
         
-        # Отправляем сообщение
-        url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-        data = {
-            "chat_id": CHAT_ID,
-            "text": message,
-            "parse_mode": "Markdown"
-        }
-        
-        response = requests.post(url, json=data)
-        
-        if response.status_code == 200:
-            print(f"✅ Отчет отправлен для {stats['date']}")
-            return True
-        else:
-            print(f"❌ Ошибка отправки: {response.status_code}")
-            return False
+        # Отправляем через Telegram API
+        try:
+            url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+            data = {
+                "chat_id": user_id,
+                "text": message
+                # parse_mode не используем, чтобы избежать ошибок
+            }
             
+            response = requests.post(url, json=data, timeout=10)
+            
+            if response.status_code == 200:
+                logger.info(f"✅ Отчёт отправлен пользователю {user_id} ({first_name})")
+                successful += 1
+            else:
+                logger.error(f"❌ Ошибка отправки пользователю {user_id}: {response.status_code}")
+                failed += 1
+                
+        except Exception as e:
+            logger.error(f"❌ Ошибка при отправке пользователю {user_id}: {e}")
+            failed += 1
+        
+        # Небольшая задержка, чтобы не спамить Telegram
+        await asyncio.sleep(0.3)
+    
+    logger.info(f"📊 Рассылка завершена: успешно={successful}, ошибок={failed}")
+
+def main():
+    """Точка входа"""
+    try:
+        asyncio.run(send_daily_reports())
+        sys.exit(0)
     except Exception as e:
-        print(f"❌ Критическая ошибка: {e}")
-        return False
+        logger.error(f"❌ Критическая ошибка: {e}")
+        sys.exit(1)
 
 if __name__ == "__main__":
-    if not BOT_TOKEN or not CHAT_ID:
-        print("❌ Установите BOT_TOKEN и CHAT_ID в переменные окружения Railway")
-        sys.exit(1)
-    
-    print(f"📅 Запуск ежедневного отчета...")
-    success = send_telegram_message()
-    sys.exit(0 if success else 1)
+    main()
