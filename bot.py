@@ -1,6 +1,7 @@
 import logging
 import requests
 from datetime import datetime, timedelta
+import asyncio  # 👈 ЭТА СТРОКА НОВАЯ
 from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove
 from telegram.ext import (
     Application, CommandHandler, MessageHandler, 
@@ -9,10 +10,9 @@ from telegram.ext import (
 import os
 import csv
 from collections import defaultdict
-import os
-import sqlite3 
+import sqlite3
 
-from database import init_database, add_or_update_user, get_all_users, save_expense
+from database import init_database, add_or_update_user, get_all_users, save_expense, get_user_stats
 
 # Получаем данные из переменных окружения Railway
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
