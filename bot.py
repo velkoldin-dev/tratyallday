@@ -445,6 +445,7 @@ async def test_report_command(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 def main():
     """Основная функция запуска бота"""
+    init_database()
     # Создаем приложение
     application = Application.builder().token(BOT_TOKEN).build()
     
