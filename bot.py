@@ -438,7 +438,7 @@ async def test_report_command(update: Update, context: ContextTypes.DEFAULT_TYPE
                 f"получить полноценный отчет."
             )
         
-        await update.message.reply_text(message, parse_mode='Markdown')
+        await update.message.reply_text(message)
         
     except Exception as e:
         await update.message.reply_text(f"❌ Ошибка: {str(e)}")
@@ -459,7 +459,7 @@ async def users_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for user in users:
         message += f"• {user['first_name']} (@{user['username']}) - `{user['user_id']}`\n"
     
-    await update.message.reply_text(message, parse_mode='Markdown')
+    await update.message.reply_text(message)
 # ==================== ОСНОВНАЯ ФУНКЦИЯ ====================
 
 def main():
