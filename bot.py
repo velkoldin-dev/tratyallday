@@ -10,7 +10,7 @@ import os
 import csv
 from collections import defaultdict
 import os
-
+import sqlite3 
 # Получаем данные из переменных окружения Railway
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
 if not BOT_TOKEN:
