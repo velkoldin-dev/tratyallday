@@ -276,7 +276,6 @@ def main():
     application = Application.builder().token(BOT_TOKEN).build()
     
     # ✅ ПЛАНИРОВЩИК ЕЖЕДНЕВНЫХ ОТЧЁТОВ
-    # Отправка каждый день в 9:00 по Москве (6:00 UTC при GMT+3)
     job_queue = application.job_queue
     job_queue.run_daily(
         send_daily_report,
@@ -284,19 +283,19 @@ def main():
     )
     
     # Диалог добавления трат
-conv_handler = ConversationHandler(
-    entry_points=[CommandHandler('start', start)],
-    states={
-        AMOUNT: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_amount)],
-        CATEGORY: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_category)],
-    },
-    fallbacks=[
-        CommandHandler('cancel', cancel),
-        CommandHandler('help', help_command),  # ✅ Добавлено
-        CommandHandler('stats', stats_command),  # ✅ Добавлено
-        CommandHandler('myid', myid_command),  # ✅ Добавлено
-    ],
-)
+    conv_handler = ConversationHandler(
+        entry_points=[CommandHandler('start', start)],
+        states={
+            AMOUNT: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_amount)],
+            CATEGORY: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_category)],
+        },
+        fallbacks=[
+            CommandHandler('cancel', cancel),
+            CommandHandler('help', help_command),
+            CommandHandler('stats', stats_command),
+            CommandHandler('myid', myid_command),
+        ],
+    )
     
     # Регистрация обработчиков
     application.add_handler(conv_handler)
@@ -304,7 +303,7 @@ conv_handler = ConversationHandler(
     application.add_handler(CommandHandler("stats", stats_command))
     application.add_handler(CommandHandler("myid", myid_command))
     application.add_handler(CommandHandler("users", users_command))
-    application.add_handler(CommandHandler("testreport", test_report_command))  # ✅ Добавлен тестовый отчёт
+    application.add_handler(CommandHandler("testreport", test_report_command))
     
     logger.info("=" * 50)
     logger.info("🤖 Бот учета трат запущен!")
