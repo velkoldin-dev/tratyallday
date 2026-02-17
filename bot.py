@@ -201,8 +201,7 @@ async def send_daily_report(context: ContextTypes.DEFAULT_TYPE):
         
         await context.bot.send_message(
             chat_id=YOUR_USER_ID,
-            text=message,
-            parse_mode='Markdown'
+            text=message
         )
         
         logger.info(f"📨 Отправлен ежедневный отчет для {37888528}")
@@ -224,8 +223,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     await update.message.reply_text(
         "💰 *Бот учета трат*\n\n"
-        "Введите сумму траты (только число, например: 1500.50):",
-        parse_mode='Markdown'
+        "Введите сумму траты (только число, например: 1500.50):"
     )
     return AMOUNT
 
@@ -280,15 +278,13 @@ async def get_category(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"📅 Дата: {date_today}\n"
             f"💸 Сумма: {amount:.2f} руб.\n"
             f"📂 Категория: {category}\n\n"
-            f"📊 *Данные сохранены в Google Таблицу и локальный файл!*",
-            parse_mode='Markdown',
+            f"📊 *Данные сохранены в Google Таблицу и локальный файл!*"
             reply_markup=ReplyKeyboardRemove()
         )
     else:
         await update.message.reply_text(
             "❌ *Ошибка при сохранении!*\n\n"
-            "Пожалуйста, попробуйте еще раз через некоторое время.",
-            parse_mode='Markdown',
+            "Пожалуйста, попробуйте еще раз через некоторое время."
             reply_markup=ReplyKeyboardRemove()
         )
     
@@ -349,8 +345,7 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             f"📊 *Статистика за сегодня ({date_today}):*\n\n"
             f"*Общие траты:* {total_today:.2f} руб.\n\n"
-            "Используйте /start для добавления новой траты.",
-            parse_mode='Markdown'
+            "Используйте /start для добавления новой траты."
         )
     except Exception as e:
         logger.error(f"Ошибка при получении статистики: {e}")
@@ -368,8 +363,7 @@ async def myid_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"• Будущих уведомлений\n\n"
         f"Чтобы изменить user_id в боте, найдите в коде строку:\n"
         f"`YOUR_USER_ID = 37888528`\n"
-        f"и замените `37888528` на `{user_id}`",
-        parse_mode='Markdown'
+        f"и замените `37888528` на `{user_id}`"
     )
 async def test_report_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Тестовая отправка отчета прямо сейчас"""
