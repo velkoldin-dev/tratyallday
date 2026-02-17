@@ -317,7 +317,6 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "📌 */start* - начать добавление траты\n"
         "📌 */stats* - показать статистику за сегодня\n"
         "📌 */myid* - показать ваш user_id\n"
-        "📌 */users* - список пользователей (только для админа)\n"
         "📌 */help* - эта справка\n"
         "📌 */cancel* - отменить текущую операцию\n\n"
         "*Как пользоваться:*\n"
