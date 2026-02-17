@@ -1,7 +1,7 @@
 {
   "cron": {
-    "daily_report": {
-      "schedule": "0 9 * * *",
+    "dailyReport": {
+      "schedule": "0 6 * * *",
       "command": "python daily_report.py"
     }
   }
