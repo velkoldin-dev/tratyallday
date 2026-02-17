@@ -1,37 +1,32 @@
 import logging
-import requests
-from datetime import datetime, timedelta, timezone
 import asyncio
+from datetime import datetime, timedelta, time
 from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove
 from telegram.ext import (
     Application, CommandHandler, MessageHandler, 
     ConversationHandler, filters, ContextTypes
 )
 import os
-import csv
 from collections import defaultdict
-import sqlite3
-
-from database import init_database, add_or_update_user, get_all_users, save_expense, get_user_stats
-
-# Получаем данные из переменных окружения Railway
+from database import (
+    init_database, add_or_update_user, get_all_users, 
+    save_expense, get_user_stats
+)
+# Переменные окружения
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
 if not BOT_TOKEN:
     raise ValueError("❌ Установите BOT_TOKEN в Railway Variables")
-
 TIMEZONE_OFFSET = int(os.environ.get("TIMEZONE_OFFSET", 3))
-
-# Настройка логирования
+ADMIN_ID = int(os.environ.get("ADMIN_ID", 37888528))
+# Логирование
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO
 )
 logger = logging.getLogger(__name__)
-
-# Определяем этапы разговора
+# Этапы разговора
 AMOUNT, CATEGORY = range(2)
-
-# Категории трат с эмодзи
+# Категории трат
 CATEGORIES = [
     ["🛒 Супермаркеты и продукты питания"],
     ["🍽️ Рестораны и кафе"],
@@ -43,133 +38,21 @@ CATEGORIES = [
     ["💪 Фитнес и здоровье"],
     ["📌 Другое"]
 ]
-
-# ==================== CSV ФУНКЦИИ ====================
-
-def get_today_date():
-    """Возвращает сегодняшнюю дату в формате день.месяц по GMT+3"""
-    moscow_time = datetime.utcnow() + timedelta(hours=TIMEZONE_OFFSET)
-    return moscow_time.strftime("%d.%m")
-
-def save_expense_to_csv(date, amount, category):
-    """Сохраняет трату в CSV файл (локальная копия для статистики)"""
-    try:
-        # Убираем эмодзи из категории
-        clean_category = category.split(' ', 1)[1] if ' ' in category else category
-        
-        # Проверяем, существует ли файл
-        file_exists = os.path.exists('expenses.csv')
-        
-        # Открываем файл для добавления данных
-        with open('expenses.csv', 'a', newline='', encoding='utf-8') as f:
-            writer = csv.writer(f)
-            
-            # Если файл новый, добавляем заголовки
-            if not file_exists:
-                writer.writerow(['Дата', 'Трата', 'Категория'])
-            
-            # Добавляем запись
-            writer.writerow([date, f"{amount:.2f}", clean_category])
-        
-        logger.info(f"Сохранено в CSV: {date}, {amount} руб., {clean_category}")
-        return True
-        
-    except Exception as e:
-        logger.error(f"Ошибка при сохранении в CSV: {e}")
-        return False
-
-def get_yesterday_date():
-    """Возвращает вчерашнюю дату в формате день.месяц по GMT+3"""
-    moscow_time = datetime.utcnow() + timedelta(hours=TIMEZONE_OFFSET)
-    yesterday = moscow_time - timedelta(days=1)
-    return yesterday.strftime("%d.%m")
-
-def get_yesterday_stats():
-    """Получает статистику за вчера из CSV файла"""
-    try:
-        date_yesterday = get_yesterday_date()
-        
-        # Проверяем, существует ли файл
-        if not os.path.exists('expenses.csv'):
-            return {
-                "date": date_yesterday,
-                "total": 0,
-                "top_category": "Нет трат",
-                "has_data": False
-            }
-        
-        total = 0
-        category_totals = defaultdict(float)
-        
-        # Читаем CSV файл
-        with open('expenses.csv', 'r', encoding='utf-8') as f:
-            reader = csv.reader(f)
-            next(reader)  # Пропускаем заголовок
-            
-            for row in reader:
-                if len(row) >= 3 and row[0] == date_yesterday:  # Только вчерашние
-                    try:
-                        amount = float(row[1])
-                        category = row[2]
-                        total += amount
-                        category_totals[category] += amount
-                    except (ValueError, TypeError):
-                        continue
-        
-        # Определяем топ-категорию
-        top_category = "Нет трат"
-        if category_totals:
-            top_category = max(category_totals.items(), key=lambda x: x[1])[0]
-        
-        return {
-            "date": date_yesterday,
-            "total": total,
-            "top_category": top_category,
-            "has_data": total > 0
-        }
-        
-    except Exception as e:
-        logger.error(f"Ошибка при чтении статистики: {e}")
-        return {
-            "date": get_yesterday_date(),
-            "total": 0,
-            "top_category": "Ошибка",
-            "has_data": False
-        }
-
-# ==================== ФУНКЦИИ СОХРАНЕНИЯ ====================
-
-def save_expense_to_db(date, amount, category, user_id):
-    """Сохраняет трату в базу данных"""
-    try:
-        # Убираем эмодзи из категории
-        clean_category = category.split(' ', 1)[1] if ' ' in category else category
-        
-        # Сохраняем в БД через нашу функцию
-        success = save_expense(
-            user_id=user_id,
-            amount=amount,
-            category=clean_category,
-            date=date
-        )
-        
-        if success:
-            logger.info(f"💰 Данные сохранены в БД: {date}, {amount}, {clean_category}")
-            return True
-        else:
-            logger.error("❌ Ошибка сохранения в БД")
-            return False
-            
-    except Exception as e:
-        logger.error(f"❌ Ошибка при сохранении: {e}")
-        return False
-
-# ==================== ЕЖЕДНЕВНЫЙ ОТЧЕТ ====================
-
+# ==================== УТИЛИТЫ ====================
+def get_moscow_time():
+    """Возвращает текущее время по Москве"""
+    return datetime.utcnow() + timedelta(hours=TIMEZONE_OFFSET)
+def format_date(dt=None):
+    """Форматирует дату в DD.MM"""
+    if dt is None:
+        dt = get_moscow_time()
+    return dt.strftime("%d.%m")
+def clean_category(category: str) -> str:
+    """Убирает эмодзи из названия категории"""
+    return category.split(' ', 1)[1] if ' ' in category else category
+# ==================== ЕЖЕДНЕВНЫЙ ОТЧЁТ ====================
 async def send_daily_report(context: ContextTypes.DEFAULT_TYPE):
-    """Отправляет ежедневный отчёт ВСЕМ пользователям"""
-    
-    # Получаем всех пользователей из БД
+    """Отправляет ежедневный отчёт всем пользователям"""
     users = get_all_users()
     
     if not users:
@@ -182,16 +65,14 @@ async def send_daily_report(context: ContextTypes.DEFAULT_TYPE):
         user_id = user['user_id']
         first_name = user['first_name']
         
-        # Получаем статистику за вчера (days=1)
         stats = get_user_stats(user_id, days=1)
         
-        # Формируем сообщение
         if stats['has_data']:
-            # Берём топ-3 категории
             top_categories = stats['categories'][:3]
-            categories_text = ""
-            for cat in top_categories:
-                categories_text += f"• {cat['category']}: {cat['total']:.2f} руб.\n"
+            categories_text = "\n".join(
+                f"• {cat['category']}: {cat['total']:.2f} руб."
+                for cat in top_categories
+            )
             
             message = (
                 f"☀️ Доброе утро, {first_name}!\n\n"
@@ -206,22 +87,15 @@ async def send_daily_report(context: ContextTypes.DEFAULT_TYPE):
             )
         
         try:
-            await context.bot.send_message(
-                chat_id=user_id,
-                text=message
-            )
+            await context.bot.send_message(chat_id=user_id, text=message)
             logger.info(f"✅ Отчёт отправлен пользователю {user_id}")
         except Exception as e:
             logger.error(f"❌ Ошибка отправки пользователю {user_id}: {e}")
         
-        # Небольшая задержка между отправками
         await asyncio.sleep(0.5)
-
 # ==================== ОБРАБОТЧИКИ КОМАНД ====================
-
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик команды /start"""
-    
     user = update.effective_user
     add_or_update_user(
         user_id=user.id,
@@ -231,10 +105,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     await update.message.reply_text(
         "💰 *Бот учета трат*\n\n"
-        "Введите сумму траты (только число, например: 1500.50):"
+        "Введите сумму траты (только число, например: 1500.50):",
+        parse_mode='Markdown'
     )
     return AMOUNT
-
 async def get_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Получаем сумму траты от пользователя"""
     try:
@@ -242,215 +116,128 @@ async def get_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         if amount <= 0:
             await update.message.reply_text(
-                "Сумма должна быть положительной. Попробуйте еще раз:"
+                "❌ Сумма должна быть положительной. Попробуйте еще раз:"
             )
             return AMOUNT
         
-        # Сохраняем сумму в контексте
         context.user_data['amount'] = amount
-        
-        # Создаем клавиатуру с категориями
-        reply_keyboard = CATEGORIES
         
         await update.message.reply_text(
             f"💵 Сумма: {amount:.2f} руб.\n"
             "Выберите категорию:",
             reply_markup=ReplyKeyboardMarkup(
-                reply_keyboard, 
+                CATEGORIES, 
                 one_time_keyboard=True,
                 resize_keyboard=True
             )
         )
         return CATEGORY
+        
     except ValueError:
         await update.message.reply_text(
-            "Пожалуйста, введите число (например: 500 или 75.50). "
+            "❌ Пожалуйста, введите число (например: 500 или 75.50).\n"
             "Попробуйте еще раз:"
         )
         return AMOUNT
-
 async def get_category(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Получаем категорию и сохраняем данные"""
     category = update.message.text
     amount = context.user_data.get('amount', 0)
-    user_id = update.effective_user.id  # 👈 получаем ID пользователя
+    user_id = update.effective_user.id
     
-    # Получаем сегодняшнюю дату
-    date_today = get_today_date()
+    date_today = format_date()
+    clean_cat = clean_category(category)
     
-    # 👇 СОХРАНЯЕМ В БД
-    success = save_expense_to_db(date_today, amount, category, user_id)
+    success = save_expense(
+        user_id=user_id,
+        amount=amount,
+        category=clean_cat,
+        date=date_today
+    )
     
-    # 👇 ОТВЕЧАЕМ ПОЛЬЗОВАТЕЛЮ
     if success:
         await update.message.reply_text(
             f"✅ Запись добавлена!\n\n"
             f"📅 Дата: {date_today}\n"
             f"💸 Сумма: {amount:.2f} руб.\n"
-            f"📂 Категория: {category}",
+            f"📂 Категория: {clean_cat}",
             reply_markup=ReplyKeyboardRemove()
         )
     else:
         await update.message.reply_text(
-            "❌ Ошибка при сохранении!\n\n"
-            "Пожалуйста, попробуйте еще раз.",
+            "❌ Ошибка при сохранении! Попробуйте еще раз.",
             reply_markup=ReplyKeyboardRemove()
         )
     
-    # Очищаем данные пользователя
     context.user_data.clear()
     
-    # Предлагаем ввести новую трату
     await update.message.reply_text(
         "Введите сумму следующей траты (или /cancel для отмены):"
     )
     return AMOUNT
-
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик отмены"""
     await update.message.reply_text(
-        "Операция отменена. Используйте /start для начала учета трат.",
+        "❌ Операция отменена. Используйте /start для начала учета трат.",
         reply_markup=ReplyKeyboardRemove()
     )
     context.user_data.clear()
     return ConversationHandler.END
-
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик команды /help"""
     await update.message.reply_text(
         "*Помощь по боту:*\n\n"
-        "📌 */start* - начать добавление трат\n"
-        "📌 */stats* - показать статистику за сегодня\n"
-        "📌 */myid* - показать ваш user_id\n"
-        "📌 */help* - эта справка\n"
-        "📌 */cancel* - отменить текущую операцию\n\n"
+        "📌 /start - начать добавление трат\n"
+        "📌 /stats - показать статистику за сегодня\n"
+        "📌 /myid - показать ваш user\\_id\n"
+        "📌 /testreport - протестировать отчёт (отправить сейчас)\n"
+        "📌 /help - эта справка\n"
+        "📌 /cancel - отменить текущую операцию\n\n"
         "*Как пользоваться:*\n"
-        "1. Введите сумму траты (например: 350)\n"
-        "2. Выберите категорию из списка\n"
-        "3. Бот автоматически сохранит данные\n\n"
+        "1\\. Введите сумму траты (например: 350)\n"
+        "2\\. Выберите категорию из списка\n"
+        "3\\. Бот автоматически сохранит данные\n\n"
         "*Ежедневные отчеты:*\n"
         "📨 Каждый день в 9:00 (МСК) бот пришлет отчет о вчерашних тратах",
+        parse_mode='MarkdownV2'
     )
-
 async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Показать статистику за сегодня"""
-    date_today = get_today_date()
+    user_id = update.effective_user.id
+    stats = get_user_stats(user_id, days=0)
     
-    # Читаем статистику за сегодня из CSV
-    try:
-        total_today = 0
-        if os.path.exists('expenses.csv'):
-            with open('expenses.csv', 'r', encoding='utf-8') as f:
-                reader = csv.reader(f)
-                next(reader)
-                
-                for row in reader:
-                    if len(row) >= 3 and row[0] == date_today:
-                        try:
-                            total_today += float(row[1])
-                        except (ValueError, TypeError):
-                            continue
+    date_today = format_date()
+    
+    if stats['has_data']:
+        top_categories = stats['categories'][:3]
+        categories_text = "\n".join(
+            f"• {cat['category']}: {cat['total']:.2f} руб."
+            for cat in top_categories
+        )
         
-        await update.message.reply_text(
+        message = (
             f"📊 *Статистика за сегодня ({date_today}):*\n\n"
-            f"*Общие траты:* {total_today:.2f} руб.\n\n"
-            "Используйте /start для добавления новой траты."
+            f"💰 Общие траты: {stats['total']:.2f} руб.\n\n"
+            f"🏆 Топ категории:\n{categories_text}"
         )
-    except Exception as e:
-        logger.error(f"Ошибка при получении статистики: {e}")
-        await update.message.reply_text(
-            "❌ Ошибка при получении статистики. Попробуйте позже."
+    else:
+        message = (
+            f"📊 *Статистика за сегодня ({date_today}):*\n\n"
+            f"💰 Общие траты: 0 руб.\n\n"
+            f"Пока нет трат. Используйте /start для добавления."
         )
-
+    
+    await update.message.reply_text(message, parse_mode='Markdown')
 async def myid_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Показывает user_id пользователя"""
     user_id = update.effective_user.id
     await update.message.reply_text(
-        f"📋 *Ваш user_id:* `{user_id}`\n\n"
-        f"Поздравляю :) \n"
+        f"📋 *Ваш user\\_id:* `{user_id}`\n\nПоздравляю :\\)",
+        parse_mode='MarkdownV2'
     )
-async def test_report_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Тестовая отправка отчета прямо сейчас"""
-    try:
-        await update.message.reply_text("🔄 Тестирую отправку отчета...")
-        
-        # Импортируем нужные функции
-        from datetime import datetime, timedelta
-        import os
-        import csv
-        from collections import defaultdict
-        
-        # Функция для получения вчерашней даты
-        def get_yesterday_date_test():
-            moscow_time = datetime.utcnow() + timedelta(hours=TIMEZONE_OFFSET)
-            yesterday = moscow_time - timedelta(days=1)
-            return yesterday.strftime("%d.%m")
-        
-        # Получаем вчерашнюю дату
-        date_yesterday = get_yesterday_date_test()
-        await update.message.reply_text(f"📅 Ищу данные за: {date_yesterday}")
-        
-        # Проверяем файл
-        if not os.path.exists('expenses.csv'):
-            await update.message.reply_text("❌ Файл expenses.csv не найден!")
-            return
-        
-        # Читаем данные
-        total = 0
-        category_totals = defaultdict(float)
-        
-        with open('expenses.csv', 'r', encoding='utf-8') as f:
-            reader = csv.reader(f)
-            try:
-                header = next(reader)
-            except StopIteration:
-                await update.message.reply_text("❌ Файл expenses.csv пустой!")
-                return
-            
-            found = 0
-            for row in reader:
-                if len(row) >= 3 and row[0] == date_yesterday:
-                    try:
-                        amount = float(row[1])
-                        category = row[2]
-                        total += amount
-                        category_totals[category] += amount
-                        found += 1
-                    except (ValueError, TypeError):
-                        continue
-        
-        # Формируем отчет
-        if total > 0:
-            top_category = max(category_totals.items(), key=lambda x: x[1])[0]
-            message = (
-                f"✅ *Тестовый отчет:*\n\n"
-                f"📅 *Дата:* {date_yesterday}\n"
-                f"💰 *Сумма:* {total:.2f} руб.\n"
-                f"📊 *Записей найдено:* {found}\n"
-                f"🏆 *Топ-категория:* {top_category}\n\n"
-                f"Если этот отчет отображается корректно,\n"
-                f"ежедневные отчеты в 9:00 тоже будут работать!"
-            )
-        else:
-            message = (
-                f"ℹ️ *Тестовый отчет:*\n\n"
-                f"📅 *Дата:* {date_yesterday}\n"
-                f"💰 *Сумма:* 0 руб.\n"
-                f"📊 *Записей найдено:* {found}\n\n"
-                f"⚠️ *Внимание:* Нет данных за вчера!\n"
-                f"Добавьте траты через /start, чтобы завтра\n"
-                f"получить полноценный отчет."
-            )
-        
-        await update.message.reply_text(message)
-        
-    except Exception as e:
-        await update.message.reply_text(f"❌ Ошибка: {str(e)}")
-
 async def users_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Показывает список пользователей (только для админа)"""
-    # Проверяем, что это ты
-    if update.effective_user.id != 37888528:
+    if update.effective_user.id != ADMIN_ID:
         await update.message.reply_text("❌ Эта команда только для админа")
         return
     
@@ -461,18 +248,42 @@ async def users_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     message = "👥 *Список пользователей:*\n\n"
     for user in users:
-        message += f"• {user['first_name']} (@{user['username']}) - `{user['user_id']}`\n"
+        username = user['username'] or 'нет username'
+        message += f"• {user['first_name']} (@{username}) - `{user['user_id']}`\n"
     
-    await update.message.reply_text(message)
+    await update.message.reply_text(message, parse_mode='Markdown')
+async def test_report_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Тестовая отправка отчёта прямо сейчас"""
+    await update.message.reply_text(
+        "🔄 Отправляю тестовый отчёт...\n"
+        "(Все пользователи получат отчёт за вчера)"
+    )
+    
+    try:
+        await send_daily_report(context)
+        await update.message.reply_text(
+            "✅ Отчёт успешно отправлен!\n"
+            "Проверь, что все пользователи получили сообщение."
+        )
+    except Exception as e:
+        await update.message.reply_text(f"❌ Ошибка при отправке: {str(e)}")
+        logger.error(f"Ошибка в test_report_command: {e}")
 # ==================== ОСНОВНАЯ ФУНКЦИЯ ====================
-
 def main():
     """Основная функция запуска бота"""
     init_database()
-    # Создаем приложение
+    
     application = Application.builder().token(BOT_TOKEN).build()
     
-    # Создаем обработчик диалога
+    # ✅ ПЛАНИРОВЩИК ЕЖЕДНЕВНЫХ ОТЧЁТОВ
+    # Отправка каждый день в 9:00 по Москве (6:00 UTC при GMT+3)
+    job_queue = application.job_queue
+    job_queue.run_daily(
+        send_daily_report,
+        time=time(hour=(9 - TIMEZONE_OFFSET) % 24, minute=0)
+    )
+    
+    # Диалог добавления трат
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler('start', start)],
         states={
@@ -482,23 +293,21 @@ def main():
         fallbacks=[CommandHandler('cancel', cancel)],
     )
     
-    # Добавляем обработчики
+    # Регистрация обработчиков
     application.add_handler(conv_handler)
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("stats", stats_command))
     application.add_handler(CommandHandler("myid", myid_command))
-    application.add_handler(CommandHandler("testreport", test_report_command)) 
     application.add_handler(CommandHandler("users", users_command))
+    application.add_handler(CommandHandler("testreport", test_report_command))  # ✅ Добавлен тестовый отчёт
     
-    # Запускаем бота
-    print("=" * 50)
-    print("🤖 Бот учета трат запущен!")
-    print("⏰ Ежедневные отчеты будут приходить в 9:00 по Москве или по запросу")
-    print("💾 Данные сохраняются в базу данных")
-    print("🆔 Напишите боту /myid чтобы узнать ваш user_id (вдруг вам интересно)")
-    print("=" * 50)
+    logger.info("=" * 50)
+    logger.info("🤖 Бот учета трат запущен!")
+    logger.info("⏰ Ежедневные отчеты будут приходить в 9:00 по Москве")
+    logger.info("💾 Данные сохраняются в базу данных")
+    logger.info("🧪 Для теста используйте команду /testreport")
+    logger.info("=" * 50)
     
     application.run_polling(allowed_updates=Update.ALL_TYPES)
-
 if __name__ == '__main__':
     main()
