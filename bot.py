@@ -106,7 +106,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "💰 *Бот учета трат*\n\n"
         "Введите сумму траты (только число, например: 1500.50):",
-        parse_mode='Markdown'
     )
     return AMOUNT
 async def get_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -199,7 +198,6 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "3. Бот автоматически сохранит данные\n\n"
         "*Ежедневные отчеты:*\n"
         "📨 Каждый день в 9:00 (МСК) бот пришлет отчет о вчерашних тратах",
-        parse_mode='Markdown'
     )
 async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Показать статистику за сегодня"""
@@ -227,13 +225,12 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"Пока нет трат. Используйте /start для добавления."
         )
     
-    await update.message.reply_text(message, parse_mode='Markdown')
+    await update.message.reply_text(message)
 async def myid_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Показывает user_id пользователя"""
     user_id = update.effective_user.id
     await update.message.reply_text(
         f"📋 *Ваш user\\_id:* `{user_id}`\n\nПоздравляю :\\)",
-        parse_mode='MarkdownV2'
     )
 async def users_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Показывает список пользователей (только для админа)"""
@@ -251,7 +248,7 @@ async def users_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         username = user['username'] or 'нет username'
         message += f"• {user['first_name']} (@{username}) - `{user['user_id']}`\n"
     
-    await update.message.reply_text(message, parse_mode='Markdown')
+    await update.message.reply_text(message)
 async def test_report_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Тестовая отправка отчёта прямо сейчас"""
     await update.message.reply_text(
