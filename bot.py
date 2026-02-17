@@ -12,7 +12,7 @@ from collections import defaultdict
 import os
 import sqlite3 
 
-from database import init_database, add_or_update_user, get_all_users
+from database import init_database, add_or_update_user, get_all_users, save_expense
 
 # Получаем данные из переменных окружения Railway
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
