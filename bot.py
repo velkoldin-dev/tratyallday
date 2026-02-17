@@ -216,19 +216,6 @@ async def send_daily_report(context: ContextTypes.DEFAULT_TYPE):
         
         # Небольшая задержка между отправками
         await asyncio.sleep(0.5)
-        
-        # ⚠️ ВАЖНО: ЗАМЕНИТЕ ЭТОТ USER_ID НА ВАШ РЕАЛЬНЫЙ!
-        YOUR_USER_ID = 37888528  # <-- ЗАМЕНИТЕ НА ВАШ USER_ID!
-        
-        await context.bot.send_message(
-            chat_id=YOUR_USER_ID,
-            text=message
-        )
-        
-        logger.info(f"📨 Отправлен ежедневный отчет для {37888528}")
-        
-    except Exception as e:
-        logger.error(f"Ошибка при отправке отчета: {e}")
 
 # ==================== ОБРАБОТЧИКИ КОМАНД ====================
 
