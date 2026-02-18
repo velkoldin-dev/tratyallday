@@ -7,7 +7,7 @@ logger = logging.getLogger(__name__)
 DATABASE_URL = os.environ.get("DATABASE_URL")
 def get_db_connection():
     """Подключение к PostgreSQL"""
-    return psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
+    return psycopg.connect(DATABASE_URL, row_factory=dict_row)
 def init_database():
     """Инициализация таблиц в PostgreSQL"""
     conn = get_db_connection()
