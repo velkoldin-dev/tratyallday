@@ -157,19 +157,6 @@ async def begin_expense(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     return AMOUNT
         
-        context.user_data['amount'] = amount
-        
-        await update.message.reply_text(
-            f"💵 Сумма: {amount:.2f} руб.\n"
-            "Выберите категорию:",
-            reply_markup=ReplyKeyboardMarkup(
-                CATEGORIES, 
-                one_time_keyboard=True,
-                resize_keyboard=True
-            )
-        )
-        return CATEGORY
-        
     except ValueError:
         await update.message.reply_text(
             "❌ Пожалуйста, введите число (например: 500 или 75.50).\n"
@@ -347,18 +334,35 @@ def main():
         send_daily_report,
         time=time(hour=(9 - TIMEZONE_OFFSET) % 24, minute=0)
     )
-def main():
-    """Основная функция запуска бота"""
-    init_database()
     
-    application = Application.builder().token(BOT_TOKEN).build()
+async def get_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработчик ввода суммы"""
+    text = update.message.text.strip()
     
-    # ✅ ПЛАНИРОВЩИК ЕЖЕДНЕВНЫХ ОТЧЁТОВ
-    job_queue = application.job_queue
-    job_queue.run_daily(
-        send_daily_report,
-        time=time(hour=(9 - TIMEZONE_OFFSET) % 24, minute=0)
-    )
+    try:
+        amount = float(text.replace(',', '.'))
+        if amount <= 0:
+            raise ValueError("Сумма должна быть положительной")
+        
+        context.user_data['amount'] = amount
+        
+        await update.message.reply_text(
+            f"💵 Сумма: {amount:.2f} руб.\n"
+            "Выберите категорию:",
+            reply_markup=ReplyKeyboardMarkup(
+                CATEGORIES, 
+                one_time_keyboard=True,
+                resize_keyboard=True
+            )
+        )
+        return CATEGORY
+        
+    except ValueError:
+        await update.message.reply_text(
+            "❌ Неверный формат! Введите число (например: 1200 или 450.50):",
+            reply_markup=ReplyKeyboardRemove()
+        )
+        return AMOUNT
     
     # ✅ Команда /start (вне диалога)
     application.add_handler(CommandHandler("start", start))
