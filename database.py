@@ -142,7 +142,7 @@ def get_user_stats(user_id, days=1):
 # Функция для получения операций
 def get_user_operations(user_id: int, limit: int = 30) -> list:
     """Получить последние операции пользователя"""
-    conn = sqlite3.connect('data/expenses.db')
+    conn = get_db_connection()  # ✅ Используем общую функцию
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
     
@@ -150,7 +150,7 @@ def get_user_operations(user_id: int, limit: int = 30) -> list:
         SELECT date, category, amount 
         FROM expenses 
         WHERE user_id = ? 
-        ORDER BY date DESC, id DESC 
+        ORDER BY id DESC 
         LIMIT ?
     ''', (user_id, limit))
     
