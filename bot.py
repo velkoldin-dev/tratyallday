@@ -551,9 +551,6 @@ async def menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await operations_command(update, context)
         return ConversationHandler.END
     
-    elif text == "🔧 Редактировать":
-        return await fix_start(update, context)
-    
     elif text == "🔙 Главное меню":
         await update.message.reply_text(
             "Выбери действие:",
@@ -603,12 +600,12 @@ def main():
             CommandHandler('cancel', cancel),
         ],
     )
-    
     # ========== ДИАЛОГ: ИСПРАВЛЕНИЕ ТРАТ (/fix) ==========
     conv_handler_fix = ConversationHandler(
         entry_points=[
             CommandHandler("fix", fix_start),
-        ],
+            MessageHandler(filters.Regex("^🔧 Редактировать$"), fix_start),  # ✅ Добавлено
+    ],
         states={
             FIX_SELECT: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, fix_select_expense)
@@ -634,7 +631,7 @@ def main():
     
     # Обработчик кнопок меню (вне диалогов)
     application.add_handler(MessageHandler(
-    filters.Regex("^(📈 Статистика|📄 Операции|🔧 Редактировать|🔙 Главное меню)$"),
+    filters.Regex("^(📈 Статистика|📄 Операции|🔙 Главное меню)$"),
     menu_handler
     ))
     
