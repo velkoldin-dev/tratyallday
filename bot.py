@@ -15,12 +15,12 @@ delete_expense, get_expense_by_id # ✅ Новые функции для /fix
 
 ==================== НАСТРОЙКИ ====================
 Переменные окружения
-BOT_TOKEN = os.environ.get(“BOT_TOKEN”)
+BOT_TOKEN = os.environ.get("BOT_TOKEN")
 if not BOT_TOKEN:
-raise ValueError(“❌ Установите BOT_TOKEN в Railway Variables”)
+raise ValueError("❌ Установите BOT_TOKEN в Railway Variables")
 
-TIMEZONE_OFFSET = int(os.environ.get(“TIMEZONE_OFFSET”, 3))
-ADMIN_ID = int(os.environ.get(“ADMIN_ID”, 37888528))
+TIMEZONE_OFFSET = int(os.environ.get("TIMEZONE_OFFSET", 3))
+ADMIN_ID = int(os.environ.get("ADMIN_ID", 37888528))
 
 Логирование
 logging.basicConfig(
@@ -38,44 +38,44 @@ FIX_SELECT, FIX_ACTION, FIX_AMOUNT, FIX_CATEGORY = range(2, 6)
 
 ==================== КАТЕГОРИИ ====================
 CATEGORIES = [
-[“🛒 Супермаркеты и продукты питания”],
-[“🍽️ Рестораны и кафе”],
-[“🚕 Транспорт”],
-[“📦 Онлайн-шопинг”],
-[“🎭 Развлечения”],
-[“📱 Связь и интернет”],
-[“💅 Красота и уход”],
-[“💪 Фитнес и здоровье”],
-[“📌 Другое”]
+["🛒 Супермаркеты и продукты питания"],
+["🍽️ Рестораны и кафе"],
+["🚕 Транспорт"],
+["📦 Онлайн-шопинг"],
+["🎭 Развлечения"],
+["📱 Связь и интернет"],
+["💅 Красота и уход"],
+["💪 Фитнес и здоровье"],
+["📌 Другое"]
 ]
 
 ==================== УТИЛИТЫ ====================
 def get_moscow_time():
-“”“Возвращает текущее время по Москве”“”
+"""Возвращает текущее время по Москве"""
 from datetime import timezone
 return datetime.now(timezone.utc) + timedelta(hours=TIMEZONE_OFFSET)
 
 def format_date(dt=None):
-“”“Форматирует дату в DD.MM”“”
+"""Форматирует дату в DD.MM"""
 if dt is None:
 dt = get_moscow_time()
-return dt.strftime(“%d.%m”)
+return dt.strftime("%d.%m")
 
 def clean_category(category: str) -> str:
-“”“Убирает эмодзи из названия категории”“”
+"""Убирает эмодзи из названия категории"""
 return category.split(’ ‘, 1)[1] if ’ ‘ in category else category
 
 def get_main_menu():
-“”“Клавиатура главного меню”“”
+"""Клавиатура главного меню"""
 keyboard = [
-[“💸 Добавить траты”],
-[“📈 Статистика”, “📄 Операции”]
+["💸 Добавить траты"],
+["📈 Статистика", "📄 Операции"]
 ]
 return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
 ==================== ЕЖЕДНЕВНЫЙ ОТЧЁТ ====================
 async def send_daily_report(context: ContextTypes.DEFAULT_TYPE):
-“”“Отправляет ежедневный отчёт всем пользователям в 9:00 МСК”“”
+"""Отправляет ежедневный отчёт всем пользователям в 9:00 МСК"""
 users = get_all_users()
 if not users:
     logger.info("📭 Нет пользователей для отчёта")
@@ -110,7 +110,7 @@ for user in users:
     await asyncio.sleep(0.5)  # Защита от флуда
 ==================== КОМАНДЫ ====================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-“”“Команда /start — приветствие и главное меню”“”
+"""Команда /start — приветствие и главное меню"""
 user = update.effective_user
 add_or_update_user(
 user_id=user.id,
@@ -124,26 +124,26 @@ await update.message.reply_text(
     reply_markup=get_main_menu()
 )
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-“”“Команда /help — справка по боту”“”
+"""Команда /help — справка по боту"""
 await update.message.reply_text(
-“📖 Помощь по боту:\n\n”
-“📌 /start - главное меню\n”
-“📌 /stats - статистика за сегодня\n”
-“📌 /fix - исправить последние траты\n”
-“📌 /myid - показать ваш user\_id\n”
-“📌 /testreport - тестовый отчёт (только админ)\n”
-“📌 /cancel - отменить операцию\n\n”
-“Как пользоваться:\n”
-“1️⃣ Нажми «💸 Добавить траты»\n”
-“2️⃣ Введи сумму (например: 350)\n”
-“3️⃣ Выбери категорию\n\n”
-“Ежедневные отчеты:\n”
-“📨 Каждый день в 9:00 (МСК) бот пришлёт отчёт о вчерашних тратах”,
-parse_mode=“Markdown”
+"📖 Помощь по боту:\n\n"
+"📌 /start - главное меню\n"
+"📌 /stats - статистика за сегодня\n"
+"📌 /fix - исправить последние траты\n"
+"📌 /myid - показать ваш user\_id\n"
+"📌 /testreport - тестовый отчёт (только админ)\n"
+"📌 /cancel - отменить операцию\n\n"
+"Как пользоваться:\n"
+"1️⃣ Нажми «💸 Добавить траты»\n"
+"2️⃣ Введи сумму (например: 350)\n"
+"3️⃣ Выбери категорию\n\n"
+"Ежедневные отчеты:\n"
+"📨 Каждый день в 9:00 (МСК) бот пришлёт отчёт о вчерашних тратах",
+parse_mode="Markdown"
 )
 
 async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-“”“Команда /stats — статистика за сегодня”“”
+"""Команда /stats — статистика за сегодня"""
 user_id = update.effective_user.id
 stats = get_user_stats(user_id, days=0)
 date_today = format_date()
@@ -167,7 +167,7 @@ else:
 await update.message.reply_text(message, parse_mode="Markdown")
 
 async def operations_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-“”“Команда /operations — показать последние 30 трат”“”
+"""Команда /operations — показать последние 30 трат"""
 user_id = update.effective_user.id
 operations = get_user_operations(user_id, limit=30)
 if not operations:
@@ -183,17 +183,17 @@ for op in operations:
 await update.message.reply_text(message, reply_markup=get_main_menu())
 
 async def myid_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-“”“Команда /myid — показать user_id”“”
+"""Команда /myid — показать user_id"""
 user_id = update.effective_user.id
 await update.message.reply_text(
-f”📋 Ваш user\_id: {user_id}”,
-parse_mode=“Markdown”
+f"📋 Ваш user\_id: {user_id}",
+parse_mode="Markdown"
 )
 
 async def users_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-“”“Команда /users — список всех пользователей (только админ)”“”
+"""Команда /users — список всех пользователей (только админ)"""
 if update.effective_user.id != ADMIN_ID:
-await update.message.reply_text(“❌ Эта команда только для админа”)
+await update.message.reply_text("❌ Эта команда только для админа")
 return
 
 sers = get_all_users()
@@ -207,9 +207,9 @@ for user in users:
 await update.message.reply_text(message, parse_mode="Markdown")
 
 async def test_report_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-“”“Команда /testreport — тестовая отправка отчёта (только админ)”“”
+"""Команда /testreport — тестовая отправка отчёта (только админ)"""
 if update.effective_user.id != ADMIN_ID:
-await update.message.reply_text(“❌ Эта команда только для админа”)
+await update.message.reply_text("❌ Эта команда только для админа")
 return
 
 await update.message.reply_text(
@@ -224,7 +224,7 @@ except Exception as e:
 
     ==================== ДИАЛОГ: ДОБАВЛЕНИЕ ТРАТ ====================
 async def begin_expense(update: Update, context: ContextTypes.DEFAULT_TYPE):
-“”“Начало диалога добавления траты”“”
+"""Начало диалога добавления траты"""
 user = update.effective_user
 add_or_update_user(
 user_id=user.id,
@@ -239,7 +239,7 @@ await update.message.reply_text(
 return AMOUNT
 
 async def get_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
-“”“Обработчик ввода суммы”“”
+"""Обработчик ввода суммы"""
 text = update.message.text.strip()
 try:
     amount = float(text.replace(',', '.'))
