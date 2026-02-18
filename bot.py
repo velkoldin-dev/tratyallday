@@ -41,7 +41,8 @@ CATEGORIES = [
 # ==================== УТИЛИТЫ ====================
 def get_moscow_time():
     """Возвращает текущее время по Москве"""
-    return datetime.utcnow() + timedelta(hours=TIMEZONE_OFFSET)
+    from datetime import timezone
+    return datetime.now(timezone.utc) + timedelta(hours=TIMEZONE_OFFSET)
 def format_date(dt=None):
     """Форматирует дату в DD.MM"""
     if dt is None:
