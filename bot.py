@@ -319,8 +319,8 @@ async def menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик кнопок главного меню"""
     text = update.message.text
     
-if text == "💸 Добавить траты":
-    return await begin_expense(update, context)
+    if text == "💸 Добавить траты":
+        return await begin_expense(update, context)
     
     elif text == "📈 Статистика":
         await stats_command(update, context)
