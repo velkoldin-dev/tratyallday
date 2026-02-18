@@ -183,22 +183,21 @@ async def get_category(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"✅ Запись добавлена!\n\n"
             f"📅 Дата: {date_today}\n"
             f"💸 Сумма: {amount:.2f} руб.\n"
-            f"📂 Категория: {clean_cat}",
-            reply_markup=ReplyKeyboardRemove()
+            f"📂 Категория: {clean_cat}"
         )
     else:
         await update.message.reply_text(
-            "❌ Ошибка при сохранении! Попробуйте еще раз.",
-            reply_markup=ReplyKeyboardRemove()
+            "❌ Ошибка при сохранении! Попробуйте еще раз."
         )
     
     context.user_data.clear()
     
-await update.message.reply_text(
-    "✅ Трата добавлена! Выберите действие:",
-    reply_markup=get_main_menu()
-)
-return ConversationHandler.END  # ✅ Возвращаемся в меню
+    # ✅ Возвращаемся в главное меню
+    await update.message.reply_text(
+        "Выберите действие:",
+        reply_markup=get_main_menu()
+    )
+    return ConversationHandler.END # ✅ Возвращаемся в меню 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик отмены"""
     await update.message.reply_text(
