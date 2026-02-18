@@ -8,10 +8,11 @@ ConversationHandler, filters, ContextTypes
 )
 import os
 from database import (
-init_database, add_or_update_user, get_all_users,
-save_expense, get_user_stats, get_user_operations,
-delete_expense, get_expense_by_id # ✅ Новые функции для /fix
+    init_database, add_or_update_user, get_all_users,
+    save_expense, get_user_stats, get_user_operations,
+    delete_expense, get_expense_by_id
 )
+from meme_generator import create_meme_for_stats
 
 # ==================== НАСТРОЙКИ ====================
 # Переменные окружения
@@ -35,6 +36,7 @@ AMOUNT, CATEGORY = range(2)
 
 # Диалог исправления трат
 FIX_SELECT, FIX_ACTION, FIX_AMOUNT, FIX_CATEGORY = range(2, 6)
+MEME_CHOICE = range(6, 7)  # Состояние выбора Сумма/Категория
 
 # ==================== КАТЕГОРИИ ====================
 CATEGORIES = [
@@ -77,6 +79,7 @@ def get_main_menu():
 async def send_daily_report(context: ContextTypes.DEFAULT_TYPE):
     """Отправляет ежедневный отчёт всем пользователям в 9:00 МСК"""
     users = get_all_users()
+    
     if not users:
         logger.info("📭 Нет пользователей для отчёта")
         return
@@ -86,6 +89,7 @@ async def send_daily_report(context: ContextTypes.DEFAULT_TYPE):
     for user in users:
         user_id = user['user_id']
         first_name = user['first_name']
+        
         stats = get_user_stats(user_id, days=1)
         
         if stats['has_data']:
@@ -94,22 +98,37 @@ async def send_daily_report(context: ContextTypes.DEFAULT_TYPE):
                 f"• {cat['category']}: {cat['total']:.2f} руб."
                 for cat in top_categories
             )
+            
             message = (
                 f"☀️ Доброе утро, {first_name}!\n\n"
                 f"📊 Вчера ты потратил: {stats['total']:.2f} руб.\n\n"
-                f"🏆 Топ категории:\n{categories_text}"
+                f"🏆 Топ категории:\n{categories_text}\n\n"
+                f"😄 Хочешь я сделаю мем на основе этих данных?\n"
+                f"Если понравится – отправишь друзьям повеселиться!"
             )
-        else:  # ← 8 пробелов
+            
+            # Кнопки для генерации мема
+            keyboard = [
+                ["🔥 Жги!", "❌ Не хочу"]
+            ]
+            reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+            
+        else:
             message = (
                 f"☀️ Доброе утро, {first_name}!\n\n"
                 f"📊 Вчера у тебя не было трат.\n"
                 f"Отличный день для экономии! 💪"
             )
+            reply_markup = get_main_menu()
         
-        try:  # ← 8 пробелов
-            await context.bot.send_message(chat_id=user_id, text=message)
+        try:
+            await context.bot.send_message(
+                chat_id=user_id, 
+                text=message,
+                reply_markup=reply_markup
+            )
             logger.info(f"✅ Отчёт отправлен пользователю {user_id}")
-        except Exception as e:  # ← 8 пробелов
+        except Exception as e:
             logger.error(f"❌ Ошибка отправки пользователю {user_id}: {e}")
         
         await asyncio.sleep(0.5)
@@ -600,6 +619,101 @@ def main():
             CommandHandler('cancel', cancel),
         ],
     )
+# ==================== ДИАЛОГ: ГЕНЕРАЦИЯ МЕМОВ ====================
+async def meme_choice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработчик кнопок Жги! / Не хочу"""
+    text = update.message.text
+    
+    if text == "❌ Не хочу":
+        await update.message.reply_text(
+            "Обращайся, как появится желание! 😊",
+            reply_markup=get_main_menu()
+        )
+        return ConversationHandler.END
+    
+    elif text == "🔥 Жги!":
+        user_id = update.effective_user.id
+        stats = get_user_stats(user_id, days=1)
+        
+        # Сохраняем статистику в контекст
+        context.user_data['meme_stats'] = stats
+        
+        keyboard = [
+            ["💰 Сумма", "📂 Категория"],
+            ["❌ Отмена"]
+        ]
+        
+        await update.message.reply_text(
+            "Выбираем общую сумму за вчера или самую дорогую категорию?",
+            reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+        )
+        return MEME_CHOICE
+    
+    else:
+        return ConversationHandler.END
+async def meme_generate(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Генерирует и отправляет мем"""
+    choice = update.message.text
+    
+    if choice == "❌ Отмена":
+        await update.message.reply_text(
+            "Отменено.",
+            reply_markup=get_main_menu()
+        )
+        context.user_data.clear()
+        return ConversationHandler.END
+    
+    stats = context.user_data.get('meme_stats', {})
+    
+    if not stats or not stats.get('has_data'):
+        await update.message.reply_text(
+            "❌ Нет данных для мема!",
+            reply_markup=get_main_menu()
+        )
+        context.user_data.clear()
+        return ConversationHandler.END
+    
+    try:
+        await update.message.reply_text(
+            "⏳ Генерирую мем...",
+            reply_markup=ReplyKeyboardRemove()
+        )
+        
+        if choice == "💰 Сумма":
+            meme_path = create_meme_for_stats(amount=stats['total'])
+        elif choice == "📂 Категория":
+            top_category = stats['categories'][0]['category']
+            meme_path = create_meme_for_stats(category=top_category)
+        else:
+            await update.message.reply_text(
+                "❌ Неверный выбор!",
+                reply_markup=get_main_menu()
+            )
+            context.user_data.clear()
+            return ConversationHandler.END
+        
+        # Отправляем мем
+        with open(meme_path, 'rb') as photo:
+            await update.message.reply_photo(
+                photo=photo,
+                caption="🎉 Твой мем готов! Отправь друзьям 😄",
+                reply_markup=get_main_menu()
+            )
+        
+        # Удаляем временный файл
+        os.remove(meme_path)
+        logger.info(f"✅ Мем отправлен пользователю {update.effective_user.id}")
+        
+    except Exception as e:
+        logger.error(f"❌ Ошибка генерации мема: {e}")
+        await update.message.reply_text(
+            "❌ Ошибка генерации мема. Попробуй позже!",
+            reply_markup=get_main_menu()
+        )
+    
+    context.user_data.clear()
+    return ConversationHandler.END
+    
     # ========== ДИАЛОГ: ИСПРАВЛЕНИЕ ТРАТ (/fix) ==========
     conv_handler_fix = ConversationHandler(
         entry_points=[
@@ -624,7 +738,25 @@ def main():
             CommandHandler('cancel', cancel),
         ],
     )
+    # ========== ДИАЛОГ: ГЕНЕРАЦИЯ МЕМОВ ==========
+    conv_handler_meme = ConversationHandler(
+        entry_points=[
+            MessageHandler(filters.Regex("^(🔥 Жги!|❌ Не хочу)$"), meme_choice_handler),
+        ],
+        states={
+            MEME_CHOICE: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, meme_generate)
+            ],
+        },
+        fallbacks=[
+            CommandHandler('cancel', cancel),
+        ],
+    )
     
+    # ========== РЕГИСТРАЦИЯ ОБРАБОТЧИКОВ ==========
+    application.add_handler(conv_handler_expense)
+    application.add_handler(conv_handler_fix)
+    application.add_handler(conv_handler_meme)  # ✅ Добавлено
     # ========== РЕГИСТРАЦИЯ ОБРАБОТЧИКОВ ==========
     application.add_handler(conv_handler_expense)
     application.add_handler(conv_handler_fix)
