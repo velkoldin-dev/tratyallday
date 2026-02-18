@@ -143,22 +143,19 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def begin_expense(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Начало диалога добавления траты"""
+    # ✅ Убедимся, что пользователь в БД
+    user = update.effective_user
+    add_or_update_user(
+        user_id=user.id,
+        username=user.username,
+        first_name=user.first_name
+    )
+    
     await update.message.reply_text(
         "💰 Введите сумму траты (только число, например: 1200):",
         reply_markup=ReplyKeyboardRemove()
     )
     return AMOUNT
-    
-async def get_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Получаем сумму траты от пользователя"""
-    try:
-        amount = float(update.message.text.replace(',', '.'))
-        
-        if amount <= 0:
-            await update.message.reply_text(
-                "❌ Сумма должна быть положительной. Попробуйте еще раз:"
-            )
-            return AMOUNT
         
         context.user_data['amount'] = amount
         
