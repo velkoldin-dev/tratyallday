@@ -69,6 +69,8 @@ def get_all_users():
 def save_expense(user_id, amount, category, date):
     """Сохраняет трату в базу"""
     try:
+        logger.info(f"📝 Попытка сохранения: user={user_id}, amount={amount}, category={category}, date={date}")
+        
         conn = get_db_connection()
         cursor = conn.cursor()
         
@@ -83,9 +85,12 @@ def save_expense(user_id, amount, category, date):
         
         logger.info(f"💰 Расход сохранен: user={user_id}, amount={amount}, category={category}")
         return True
+        
     except Exception as e:
-        logger.error(f"❌ Ошибка сохранения: {e}")
+        logger.error(f"❌ Ошибка сохранения: {type(e).__name__}: {e}")
+        logger.exception("Полный traceback:")  # Покажет весь стек ошибки
         return False
+        
 def get_user_stats(user_id, days=1):
     """Статистика пользователя за N дней"""
     conn = get_db_connection()
