@@ -176,6 +176,7 @@ async def operations_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
     """Команда /operations — показать последние 30 трат"""
     user_id = update.effective_user.id
     operations = get_user_operations(user_id, limit=30)
+    
     if not operations:
         await update.message.reply_text(
             "📭 У вас пока нет операций.\n"
@@ -183,10 +184,22 @@ async def operations_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
             reply_markup=get_main_menu()
         )
         return
+    
+    # Формируем список операций
     message = "📋 Последние 30 операций:\n\n"
     for op in operations:
         message += f"• {op['date']} | {op['category']} | {op['amount']:.2f} руб.\n"
-    await update.message.reply_text(message, reply_markup=get_main_menu())
+    
+    # Добавляем кнопку "Редактировать"
+    keyboard = [
+        ["🔧 Редактировать"],
+        ["🔙 Главное меню"]
+    ]
+    
+    await update.message.reply_text(
+        message, 
+        reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+    )
 
 async def myid_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Команда /myid — показать user_id"""
@@ -314,7 +327,7 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ==================== ДИАЛОГ: ИСПРАВЛЕНИЕ ТРАТ (/fix) ====================
 async def fix_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Команда /fix — показать последние 5 трат для исправления"""
+    """Команда /fix или кнопка Редактировать — показать последние 5 трат"""
     user_id = update.effective_user.id
     operations = get_user_operations(user_id, limit=5)
     
@@ -538,6 +551,16 @@ async def menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await operations_command(update, context)
         return ConversationHandler.END
     
+    elif text == "🔧 Редактировать":
+        return await fix_start(update, context)
+    
+    elif text == "🔙 Главное меню":
+        await update.message.reply_text(
+            "Выбери действие:",
+            reply_markup=get_main_menu()
+        )
+        return ConversationHandler.END
+    
     else:
         await update.message.reply_text(
             "❌ Неизвестная команда. Используй кнопки меню.",
@@ -611,8 +634,8 @@ def main():
     
     # Обработчик кнопок меню (вне диалогов)
     application.add_handler(MessageHandler(
-        filters.Regex("^(📈 Статистика|📄 Операции)$"),
-        menu_handler
+    filters.Regex("^(📈 Статистика|📄 Операции|🔧 Редактировать|🔙 Главное меню)$"),
+    menu_handler
     ))
     
     # ========== ЗАПУСК БОТА ==========
