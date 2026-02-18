@@ -117,6 +117,27 @@ def get_user_stats(user_id, days=1):
     ''', (user_id, target_date))
     
     categories = cursor.fetchall()
+    conn.close()
+    
+    # Формируем результат
+    if categories:
+        total = sum(cat[1] for cat in categories)
+        categories_list = [
+            {'category': cat[0], 'total': cat[1]} 
+            for cat in categories
+        ]
+        
+        return {
+            'has_data': True,
+            'total': total,
+            'categories': categories_list
+        }
+    else:
+        return {
+            'has_data': False,
+            'total': 0,
+            'categories': []
+        }
     
 # Функция для получения операций
 def get_user_operations(user_id: int, limit: int = 30) -> list:
