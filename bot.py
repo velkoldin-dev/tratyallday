@@ -17,17 +17,17 @@ delete_expense, get_expense_by_id # ✅ Новые функции для /fix
 # Переменные окружения
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
 if not BOT_TOKEN:
-raise ValueError("❌ Установите BOT_TOKEN в Railway Variables")
+    raise ValueError("❌ Установите BOT_TOKEN в Railway Variables")
 
 TIMEZONE_OFFSET = int(os.environ.get("TIMEZONE_OFFSET", 3))
 ADMIN_ID = int(os.environ.get("ADMIN_ID", 37888528))
 
 # Логирование
 logging.basicConfig(
-format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-level=logging.INFO
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO
 )
-logger = logging.getLogger(name)
+logger = logging.getLogger(__name__)
 
 # ==================== СОСТОЯНИЯ ДИАЛОГОВ ====================
 # Диалог добавления трат
@@ -38,53 +38,122 @@ FIX_SELECT, FIX_ACTION, FIX_AMOUNT, FIX_CATEGORY = range(2, 6)
 
 # ==================== КАТЕГОРИИ ====================
 CATEGORIES = [
-["🛒 Супермаркеты и продукты питания"],
-["🍽️ Рестораны и кафе"],
-["🚕 Транспорт"],
-["📦 Онлайн-шопинг"],
-["🎭 Развлечения"],
-["📱 Связь и интернет"],
-["💅 Красота и уход"],
-["💪 Фитнес и здоровье"],
-["📌 Другое"]
+    ["🛒 Супермаркеты и продукты питания"],
+    ["🍽️ Рестораны и кафе"],
+    ["🚕 Транспорт"],
+    ["📦 Онлайн-шопинг"],
+    ["🎭 Развлечения"],
+    ["📱 Связь и интернет"],
+    ["💅 Красота и уход"],
+    ["💪 Фитнес и здоровье"],
+    ["📌 Другое"]
 ]
 
 # ==================== УТИЛИТЫ ====================
 def get_moscow_time():
-"""Возвращает текущее время по Москве"""
-from datetime import timezone
-return datetime.now(timezone.utc) + timedelta(hours=TIMEZONE_OFFSET)
+    """Возвращает текущее время по Москве"""
+    from datetime import timezone
+    return datetime.now(timezone.utc) + timedelta(hours=TIMEZONE_OFFSET)
 
 def format_date(dt=None):
-"""Форматирует дату в DD.MM"""
-if dt is None:
-dt = get_moscow_time()
-return dt.strftime("%d.%m")
+    """Форматирует дату в DD.MM"""
+    if dt is None:
+        dt = get_moscow_time()
+    return dt.strftime("%d.%m")
 
 def clean_category(category: str) -> str:
-"""Убирает эмодзи из названия категории"""
-return category.split(' ', 1)[1] if ' ' in category else category
+    """Убирает эмодзи из названия категории"""
+    return category.split(' ', 1)[1] if ' ' in category else category
 
 def get_main_menu():
-"""Клавиатура главного меню"""
-keyboard = [
-["💸 Добавить траты"],
-["📈 Статистика", "📄 Операции"]
-]
-return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+    """Клавиатура главного меню"""
+    keyboard = [
+        ["💸 Добавить траты"],
+        ["📈 Статистика", "📄 Операции"]
+    ]
+    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
 # ==================== ЕЖЕДНЕВНЫЙ ОТЧЁТ ====================
 async def send_daily_report(context: ContextTypes.DEFAULT_TYPE):
-"""Отправляет ежедневный отчёт всем пользователям в 9:00 МСК"""
-users = get_all_users()
-if not users:
-    logger.info("📭 Нет пользователей для отчёта")
-    return
-logger.info(f"📨 Начинаю рассылку отчётов для {len(users)} пользователей")
-for user in users:
-    user_id = user['user_id']
-    first_name = user['first_name']
-    stats = get_user_stats(user_id, days=1)
+    """Отправляет ежедневный отчёт всем пользователям в 9:00 МСК"""
+    users = get_all_users()
+    if not users:
+        logger.info("📭 Нет пользователей для отчёта")
+        return
+    
+    logger.info(f"📨 Начинаю рассылку отчётов для {len(users)} пользователей")
+    
+    for user in users:
+        user_id = user['user_id']
+        first_name = user['first_name']
+        stats = get_user_stats(user_id, days=1)
+        
+        if stats['has_data']:
+            top_categories = stats['categories'][:3]
+            categories_text = "\n".join(
+                f"• {cat['category']}: {cat['total']:.2f} руб."
+                for cat in top_categories
+            )
+            message = (
+                f"☀️ Доброе утро, {first_name}!\n\n"
+                f"📊 Вчера ты потратил: {stats['total']:.2f} руб.\n\n"
+                f"🏆 Топ категории:\n{categories_text}"
+            )
+        else:  # ← 8 пробелов
+            message = (
+                f"☀️ Доброе утро, {first_name}!\n\n"
+                f"📊 Вчера у тебя не было трат.\n"
+                f"Отличный день для экономии! 💪"
+            )
+        
+        try:  # ← 8 пробелов
+            await context.bot.send_message(chat_id=user_id, text=message)
+            logger.info(f"✅ Отчёт отправлен пользователю {user_id}")
+        except Exception as e:  # ← 8 пробелов
+            logger.error(f"❌ Ошибка отправки пользователю {user_id}: {e}")
+        
+        await asyncio.sleep(0.5)
+
+# ==================== КОМАНДЫ ====================
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Команда /start — приветствие и главное меню"""
+    user = update.effective_user
+    add_or_update_user(
+        user_id=user.id,
+        username=user.username,
+        first_name=user.first_name
+    )
+    await update.message.reply_text(
+        f"👋 Привет, {user.first_name}!\n\n"
+        "💰 Я помогу тебе вести учёт трат.\n"
+        "Выбери действие из меню ниже:",
+        reply_markup=get_main_menu()
+    )
+
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Команда /help — справка по боту"""
+    await update.message.reply_text(
+        "📖 Помощь по боту:\n\n"
+        "📌 /start - главное меню\n"
+        "📌 /stats - статистика за сегодня\n"
+        "📌 /fix - исправить последние траты\n"
+        "📌 /myid - показать ваш user\_id\n"
+        "📌 /testreport - тестовый отчёт (только админ)\n"
+        "📌 /cancel - отменить операцию\n\n"
+        "Как пользоваться:\n"
+        "1️⃣ Нажми «💸 Добавить траты»\n"
+        "2️⃣ Введи сумму (например: 350)\n"
+        "3️⃣ Выбери категорию\n\n"
+        "Ежедневные отчеты:\n"
+        "📨 Каждый день в 9:00 (МСК) бот пришлёт отчёт о вчерашних тратах",
+        parse_mode="Markdown"
+    )
+
+async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Команда /stats — статистика за сегодня"""
+    user_id = update.effective_user.id
+    stats = get_user_stats(user_id, days=0)
+    date_today = format_date()
     if stats['has_data']:
         top_categories = stats['categories'][:3]
         categories_text = "\n".join(
@@ -92,104 +161,41 @@ for user in users:
             for cat in top_categories
         )
         message = (
-            f"☀️ Доброе утро, {first_name}!\n\n"
-            f"📊 Вчера ты потратил: {stats['total']:.2f} руб.\n\n"
+            f"📊 *Статистика за сегодня ({date_today}):*\n\n"
+            f"💰 Общие траты: {stats['total']:.2f} руб.\n\n"
             f"🏆 Топ категории:\n{categories_text}"
         )
     else:
         message = (
-            f"☀️ Доброе утро, {first_name}!\n\n"
-            f"📊 Вчера у тебя не было трат.\n"
-            f"Отличный день для экономии! 💪"
+            f"📊 *Статистика за сегодня ({date_today}):*\n\n"
+            f"💰 Общие траты: 0 руб.\n\n"
+            f"Пока нет трат. Используй кнопку «💸 Добавить траты»"
         )
-    try:
-        await context.bot.send_message(chat_id=user_id, text=message)
-        logger.info(f"✅ Отчёт отправлен пользователю {user_id}")
-    except Exception as e:
-        logger.error(f"❌ Ошибка отправки пользователю {user_id}: {e}")
-    await asyncio.sleep(0.5)  # Защита от флуда
-
-# ==================== КОМАНДЫ ====================
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-"""Команда /start — приветствие и главное меню"""
-user = update.effective_user
-add_or_update_user(
-user_id=user.id,
-username=user.username,
-first_name=user.first_name
-)
-await update.message.reply_text(
-    f"👋 Привет, {user.first_name}!\n\n"
-    "💰 Я помогу тебе вести учёт трат.\n"
-    "Выбери действие из меню ниже:",
-    reply_markup=get_main_menu()
-)
-async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-"""Команда /help — справка по боту"""
-await update.message.reply_text(
-"📖 Помощь по боту:\n\n"
-"📌 /start - главное меню\n"
-"📌 /stats - статистика за сегодня\n"
-"📌 /fix - исправить последние траты\n"
-"📌 /myid - показать ваш user\_id\n"
-"📌 /testreport - тестовый отчёт (только админ)\n"
-"📌 /cancel - отменить операцию\n\n"
-"Как пользоваться:\n"
-"1️⃣ Нажми «💸 Добавить траты»\n"
-"2️⃣ Введи сумму (например: 350)\n"
-"3️⃣ Выбери категорию\n\n"
-"Ежедневные отчеты:\n"
-"📨 Каждый день в 9:00 (МСК) бот пришлёт отчёт о вчерашних тратах",
-parse_mode="Markdown"
-)
-
-async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-"""Команда /stats — статистика за сегодня"""
-user_id = update.effective_user.id
-stats = get_user_stats(user_id, days=0)
-date_today = format_date()
-if stats['has_data']:
-    top_categories = stats['categories'][:3]
-    categories_text = "\n".join(
-        f"• {cat['category']}: {cat['total']:.2f} руб."
-        for cat in top_categories
-    )
-    message = (
-        f"📊 *Статистика за сегодня ({date_today}):*\n\n"
-        f"💰 Общие траты: {stats['total']:.2f} руб.\n\n"
-        f"🏆 Топ категории:\n{categories_text}"
-    )
-else:
-    message = (
-        f"📊 *Статистика за сегодня ({date_today}):*\n\n"
-        f"💰 Общие траты: 0 руб.\n\n"
-        f"Пока нет трат. Используй кнопку «💸 Добавить траты»"
-    )
-await update.message.reply_text(message, parse_mode="Markdown")
+    await update.message.reply_text(message, parse_mode="Markdown")
 
 async def operations_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-"""Команда /operations — показать последние 30 трат"""
-user_id = update.effective_user.id
-operations = get_user_operations(user_id, limit=30)
-if not operations:
-    await update.message.reply_text(
-        "📭 У вас пока нет операций.\n"
-        "Используй кнопку «💸 Добавить траты» для начала учёта.",
-        reply_markup=get_main_menu()
-    )
-    return
-message = "📋 Последние 30 операций:\n\n"
-for op in operations:
-    message += f"• {op['date']} | {op['category']} | {op['amount']:.2f} руб.\n"
-await update.message.reply_text(message, reply_markup=get_main_menu())
+    """Команда /operations — показать последние 30 трат"""
+    user_id = update.effective_user.id
+    operations = get_user_operations(user_id, limit=30)
+    if not operations:
+        await update.message.reply_text(
+            "📭 У вас пока нет операций.\n"
+            "Используй кнопку «💸 Добавить траты» для начала учёта.",
+            reply_markup=get_main_menu()
+        )
+        return
+    message = "📋 Последние 30 операций:\n\n"
+    for op in operations:
+        message += f"• {op['date']} | {op['category']} | {op['amount']:.2f} руб.\n"
+    await update.message.reply_text(message, reply_markup=get_main_menu())
 
 async def myid_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-"""Команда /myid — показать user_id"""
-user_id = update.effective_user.id
-await update.message.reply_text(
-f"📋 Ваш user\_id: {user_id}",
-parse_mode="Markdown"
-)
+    """Команда /myid — показать user_id"""
+    user_id = update.effective_user.id
+    await update.message.reply_text(
+        f"📋 Ваш user\_id: {user_id}",
+        parse_mode="Markdown"
+    )
 
 async def users_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 """Команда /users — список всех пользователей (только админ)"""
@@ -225,45 +231,46 @@ except Exception as e:
 
 # ==================== ДИАЛОГ: ДОБАВЛЕНИЕ ТРАТ ====================
 async def begin_expense(update: Update, context: ContextTypes.DEFAULT_TYPE):
-"""Начало диалога добавления траты"""
-user = update.effective_user
-add_or_update_user(
-user_id=user.id,
-username=user.username,
-first_name=user.first_name
-)
-
-await update.message.reply_text(
-    "💰 Введи сумму траты (только число, например: 1200):",
-    reply_markup=ReplyKeyboardRemove()
-)
-return AMOUNT
-
-async def get_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
-"""Обработчик ввода суммы"""
-text = update.message.text.strip()
-try:
-    amount = float(text.replace(',', '.'))
-    if amount <= 0:
-        raise ValueError("Сумма должна быть положительной")
-    context.user_data['amount'] = amount
-    await update.message.reply_text(
-        f"💵 Сумма: {amount:.2f} руб.\n"
-        "Выбери категорию:",
-        reply_markup=ReplyKeyboardMarkup(
-            CATEGORIES, 
-            one_time_keyboard=True,
-            resize_keyboard=True
-        )
+    """Начало диалога добавления траты"""
+    user = update.effective_user
+    add_or_update_user(
+        user_id=user.id,
+        username=user.username,
+        first_name=user.first_name
     )
-    return CATEGORY
-except ValueError:
+    
     await update.message.reply_text(
-        "❌ Неверный формат! Введи число (например: 500 или 75.50):",
+        "💰 Введи сумму траты (только число, например: 1200):",
         reply_markup=ReplyKeyboardRemove()
     )
     return AMOUNT
-    async def get_category(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+async def get_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработчик ввода суммы"""
+    text = update.message.text.strip()
+    try:
+        amount = float(text.replace(',', '.'))
+        if amount <= 0:
+            raise ValueError("Сумма должна быть положительной")
+        context.user_data['amount'] = amount
+        await update.message.reply_text(
+            f"💵 Сумма: {amount:.2f} руб.\n"
+            "Выбери категорию:",
+            reply_markup=ReplyKeyboardMarkup(
+                CATEGORIES, 
+                one_time_keyboard=True,
+                resize_keyboard=True
+            )
+        )
+        return CATEGORY
+    except ValueError:
+        await update.message.reply_text(
+            "❌ Неверный формат! Введи число (например: 500 или 75.50):",
+            reply_markup=ReplyKeyboardRemove()
+        )
+        return AMOUNT
+
+async def get_category(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик выбора категории и сохранение траты"""
     category = update.message.text
     amount = context.user_data.get('amount', 0)
@@ -295,6 +302,7 @@ except ValueError:
     
     context.user_data.clear()
     return ConversationHandler.END
+
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Отмена любого диалога"""
     await update.message.reply_text(
