@@ -383,10 +383,10 @@ def main():
     )
 
     # Диалог добавления трат
-conv_handler = ConversationHandler(
-    entry_points=[
-        MessageHandler(filters.Regex("^💸 Добавить траты$"), begin_expense),  # ✅ Напрямую
-    ],
+    conv_handler = ConversationHandler(
+        entry_points=[
+            MessageHandler(filters.Regex("^💸 Добавить траты$"), begin_expense),
+        ],
         states={
             AMOUNT: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_amount)],
             CATEGORY: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_category)],
@@ -404,7 +404,7 @@ conv_handler = ConversationHandler(
     
     # Обработчик кнопок меню (вне диалога)
     application.add_handler(MessageHandler(
-        filters.Regex("^(📈 Статистика|📄 Операции)$"),  # ✅ Исправлены эмодзи
+        filters.Regex("^(📈 Статистика|📄 Операции)$"),
         menu_handler
     ))
     
