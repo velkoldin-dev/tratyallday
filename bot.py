@@ -14,7 +14,7 @@ delete_expense, get_expense_by_id # ✅ Новые функции для /fix
 )
 
 # ==================== НАСТРОЙКИ ====================
-Переменные окружения
+# Переменные окружения
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
 if not BOT_TOKEN:
 raise ValueError("❌ Установите BOT_TOKEN в Railway Variables")
@@ -22,7 +22,7 @@ raise ValueError("❌ Установите BOT_TOKEN в Railway Variables")
 TIMEZONE_OFFSET = int(os.environ.get("TIMEZONE_OFFSET", 3))
 ADMIN_ID = int(os.environ.get("ADMIN_ID", 37888528))
 
-Логирование
+# Логирование
 logging.basicConfig(
 format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
 level=logging.INFO
@@ -30,10 +30,10 @@ level=logging.INFO
 logger = logging.getLogger(name)
 
 # ==================== СОСТОЯНИЯ ДИАЛОГОВ ====================
-Диалог добавления трат
+# Диалог добавления трат
 AMOUNT, CATEGORY = range(2)
 
-Диалог исправления трат
+# Диалог исправления трат
 FIX_SELECT, FIX_ACTION, FIX_AMOUNT, FIX_CATEGORY = range(2, 6)
 
 # ==================== КАТЕГОРИИ ====================
@@ -108,6 +108,7 @@ for user in users:
     except Exception as e:
         logger.error(f"❌ Ошибка отправки пользователю {user_id}: {e}")
     await asyncio.sleep(0.5)  # Защита от флуда
+
 # ==================== КОМАНДЫ ====================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 """Команда /start — приветствие и главное меню"""
