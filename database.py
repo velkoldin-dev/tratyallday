@@ -99,11 +99,6 @@ def save_expense(user_id, amount, category, date):
         logger.exception("Полный traceback:")
         return False
         
-    except Exception as e:
-        logger.error(f"❌ Ошибка сохранения: {type(e).__name__}: {e}")
-        logger.exception("Полный traceback:")  # Покажет весь стек ошибки
-        return False
-        
 def get_user_stats(user_id, days=1):
     """Статистика пользователя за N дней"""
     conn = get_db_connection()
@@ -158,3 +153,64 @@ def get_user_operations(user_id: int, limit: int = 30) -> list:
     conn.close()
     
     return operations
+
+def get_user_operations(user_id: int, limit: int = 30) -> list:
+    """Последние операции пользователя с ID записей"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        SELECT id, date, category, amount 
+        FROM expenses 
+        WHERE user_id = %s 
+        ORDER BY id DESC 
+        LIMIT %s
+    ''', (user_id, limit))
+    
+    operations = cursor.fetchall()
+    cursor.close()
+    conn.close()
+    
+    return operations
+def delete_expense(expense_id: int) -> bool:
+    """Удаляет трату по ID"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            DELETE FROM expenses 
+            WHERE id = %s
+        ''', (expense_id,))
+        
+        conn.commit()
+        deleted_count = cursor.rowcount
+        cursor.close()
+        conn.close()
+        
+        if deleted_count > 0:
+            logger.info(f"🗑️ Трата удалена: id={expense_id}")
+            return True
+        else:
+            logger.warning(f"⚠️ Трата не найдена: id={expense_id}")
+            return False
+        
+    except Exception as e:
+        logger.error(f"❌ Ошибка удаления траты: {type(e).__name__}: {e}")
+        return False
+def get_expense_by_id(expense_id: int):
+    """Получает трату по ID (опционально, для доп. проверок)"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        SELECT id, user_id, date, category, amount 
+        FROM expenses 
+        WHERE id = %s
+    ''', (expense_id,))
+    
+    expense = cursor.fetchone()
+    cursor.close()
+    conn.close()
+    
+    return expense
