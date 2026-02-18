@@ -118,8 +118,8 @@ def get_user_stats(user_id, days=1):
     
     categories = cursor.fetchall()
     
-#  Функция для получения операций
-    def get_user_operations(user_id: int, limit: int = 30) -> list:
+# Функция для получения операций
+def get_user_operations(user_id: int, limit: int = 30) -> list:
     """Получить последние операции пользователя"""
     conn = sqlite3.connect('data/expenses.db')
     conn.row_factory = sqlite3.Row
