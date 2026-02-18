@@ -74,6 +74,14 @@ def save_expense(user_id, amount, category, date):
         conn = get_db_connection()
         cursor = conn.cursor()
         
+        # ✅ Убедимся, что пользователь существует (на случай если не вызывался /start)
+        cursor.execute('''
+            INSERT INTO users (user_id, username, first_name)
+            VALUES (%s, %s, %s)
+            ON CONFLICT (user_id) DO NOTHING
+        ''', (user_id, 'unknown', 'Unknown'))
+        
+        # Сохраняем трату
         cursor.execute('''
             INSERT INTO expenses (user_id, amount, category, date)
             VALUES (%s, %s, %s, %s)
@@ -85,6 +93,11 @@ def save_expense(user_id, amount, category, date):
         
         logger.info(f"💰 Расход сохранен: user={user_id}, amount={amount}, category={category}")
         return True
+        
+    except Exception as e:
+        logger.error(f"❌ Ошибка сохранения: {type(e).__name__}: {e}")
+        logger.exception("Полный traceback:")
+        return False
         
     except Exception as e:
         logger.error(f"❌ Ошибка сохранения: {type(e).__name__}: {e}")
