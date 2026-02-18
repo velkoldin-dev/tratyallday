@@ -364,11 +364,12 @@ application.add_handler(MessageHandler(
     filters.Regex("^(📊 Статистика|📋 Операции)$"), 
     menu_handler
 ))
-    application.add_handler(CommandHandler("help", help_command))
+        application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("stats", stats_command))
     application.add_handler(CommandHandler("myid", myid_command))
     application.add_handler(CommandHandler("users", users_command))
     application.add_handler(CommandHandler("testreport", test_report_command))
+
     
     logger.info("=" * 50)
     logger.info("🤖 Бот учета трат запущен!")
