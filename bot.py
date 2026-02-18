@@ -94,6 +94,29 @@ async def send_daily_report(context: ContextTypes.DEFAULT_TYPE):
         
         await asyncio.sleep(0.5)
 # ==================== ОБРАБОТЧИКИ КОМАНД ====================
+async def operations_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Показать последние 30 операций"""
+    user_id = update.effective_user.id
+    
+    # Получаем операции из БД
+    from database import get_user_operations  # ✅ Импорт внутри функции
+    operations = get_user_operations(user_id, limit=30)
+    
+    if not operations:
+        await update.message.reply_text(
+            "📭 У вас пока нет операций.\n"
+            "Используйте кнопку «Добавить траты» для начала учёта.",
+            reply_markup=get_main_menu()
+        )
+        return
+    
+    # Форматируем список операций
+    message = "📋 Последние 30 операций:\n\n"
+    for op in operations:
+        message += f"• {op['date']} | {op['category']} | {op['amount']:.2f} руб.\n"
+    
+    await update.message.reply_text(message, reply_markup=get_main_menu())
+    
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик команды /start"""
     user = update.effective_user
@@ -104,10 +127,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     
     await update.message.reply_text(
-        "💰 *Бот учета трат*\n\n"
-        "Введите сумму траты (только число, например: 1500.50):",
+        "💰 Бот учета трат\n\n"
+        "Выберите действие:",
+        reply_markup=get_main_menu()
     )
-    return AMOUNT
+    return ConversationHandler.END  # ✅ Изменено: выходим из диалога
 async def get_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Получаем сумму траты от пользователя"""
     try:
@@ -170,10 +194,11 @@ async def get_category(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     context.user_data.clear()
     
-    await update.message.reply_text(
-        "Введите сумму следующей траты (или /cancel для отмены):"
-    )
-    return AMOUNT
+        await update.message.reply_text(
+    "✅ Трата добавлена! Выберите действие:",
+    reply_markup=get_main_menu()
+)
+return ConversationHandler.END  # ✅ Возвращаемся в меню
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик отмены"""
     await update.message.reply_text(
@@ -265,7 +290,42 @@ async def test_report_command(update: Update, context: ContextTypes.DEFAULT_TYPE
     except Exception as e:
         await update.message.reply_text(f"❌ Ошибка при отправке: {str(e)}")
         logger.error(f"Ошибка в test_report_command: {e}")
+
+# ==================== ГЛАВНОЕ МЕНЮ ====================
+def get_main_menu():
+    """Возвращает клавиатуру главного меню"""
+    keyboard = [
+        ["💸 Добавить траты"],
+        ["📈 Статистика", "📄 Операции"]
+    ]
+    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 # ==================== ОСНОВНАЯ ФУНКЦИЯ ====================
+async def menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработчик кнопок главного меню"""
+    text = update.message.text
+    
+    if text == "💸 Добавить траты":
+        await update.message.reply_text(
+            "💰 Введите сумму траты (только число, например: 1200):",
+            reply_markup=ReplyKeyboardRemove()
+        )
+        return AMOUNT
+    
+    elif text == "📈 Статистика":
+        await stats_command(update, context)
+        return ConversationHandler.END
+    
+    elif text == "📄 Операции":
+        await operations_command(update, context)
+        return ConversationHandler.END
+    
+    else:
+        await update.message.reply_text(
+            "❌ Неизвестная команда. Используйте кнопки меню.",
+            reply_markup=get_main_menu()
+        )
+        return ConversationHandler.END
+
 def main():
     """Основная функция запуска бота"""
     init_database()
@@ -281,21 +341,29 @@ def main():
     
     # Диалог добавления трат
     conv_handler = ConversationHandler(
-        entry_points=[CommandHandler('start', start)],
-        states={
-            AMOUNT: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_amount)],
-            CATEGORY: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_category)],
-        },
-        fallbacks=[
-            CommandHandler('cancel', cancel),
-            CommandHandler('help', help_command),
-            CommandHandler('stats', stats_command),
-            CommandHandler('myid', myid_command),
-        ],
-    )
+    entry_points=[
+        CommandHandler('start', start),
+        MessageHandler(filters.Regex("^💸 Добавить траты$"), menu_handler),  # ✅ Добавлено
+    ],
+    states={
+        AMOUNT: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_amount)],
+        CATEGORY: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_category)],
+    },
+    fallbacks=[
+        CommandHandler('cancel', cancel),
+        CommandHandler('help', help_command),
+        CommandHandler('stats', stats_command),
+        CommandHandler('myid', myid_command),
+    ],
+)
     
     # Регистрация обработчиков
     application.add_handler(conv_handler)
+# Обработчик кнопок меню (вне диалога)
+application.add_handler(MessageHandler(
+    filters.Regex("^(📊 Статистика|📋 Операции)$"), 
+    menu_handler
+))
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("stats", stats_command))
     application.add_handler(CommandHandler("myid", myid_command))
