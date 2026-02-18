@@ -1,7 +1,7 @@
 import os
 import logging
-import psycopg2
-from psycopg2.extras import RealDictCursor
+import psycopg
+from psycopg.rows import dict_row
 logger = logging.getLogger(__name__)
 # Получаем URL БД из переменных Railway
 DATABASE_URL = os.environ.get("DATABASE_URL")
