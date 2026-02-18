@@ -146,7 +146,6 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "3️⃣ Выбери категорию\n\n"
         "Ежедневные отчеты:\n"
         "📨 Каждый день в 9:00 (МСК) бот пришлёт отчёт о вчерашних тратах",
-        parse_mode="Markdown"
     )
 
 async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -171,7 +170,7 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"💰 Общие траты: 0 руб.\n\n"
             f"Пока нет трат. Используй кнопку «💸 Добавить траты»"
         )
-    await update.message.reply_text(message, parse_mode="Markdown")
+    await update.message.reply_text(message)
 
 async def operations_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Команда /operations — показать последние 30 трат"""
@@ -194,40 +193,41 @@ async def myid_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     await update.message.reply_text(
         f"📋 Ваш user\_id: {user_id}",
-        parse_mode="Markdown"
     )
 
 async def users_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-"""Команда /users — список всех пользователей (только админ)"""
-if update.effective_user.id != ADMIN_ID:
-await update.message.reply_text("❌ Эта команда только для админа")
-return
-
-sers = get_all_users()
-if not users:
-    await update.message.reply_text("📭 Пользователей пока нет")
-    return
-message = "👥 *Список пользователей:*\n\n"
-for user in users:
-    username = user['username'] or 'нет username'
-    message += f"• {user['first_name']} (@{username}) - `{user['user_id']}`\n"
-await update.message.reply_text(message, parse_mode="Markdown")
+    """Команда /users — список всех пользователей (только админ)"""
+    if update.effective_user.id != ADMIN_ID:
+        await update.message.reply_text("❌ Эта команда только для админа")
+        return
+    
+    users = get_all_users()
+    if not users:
+        await update.message.reply_text("📭 Пользователей пока нет")
+        return
+    
+    message = "👥 *Список пользователей:*\n\n"
+    for user in users:
+        username = user['username'] or 'нет username'
+        message += f"• {user['first_name']} (@{username}) - `{user['user_id']}`\n"
+    
+    await update.message.reply_text(message)
 
 async def test_report_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-"""Команда /testreport — тестовая отправка отчёта (только админ)"""
-if update.effective_user.id != ADMIN_ID:
-await update.message.reply_text("❌ Эта команда только для админа")
-return
-
-await update.message.reply_text(
-    "🔄 Отправляю тестовый отчёт...\n"
-    "(Все пользователи получат отчёт за вчера)"
-)
-try:
-    await send_daily_report(context)
-    await update.message.reply_text("✅ Отчёт успешно отправлен!")
-except Exception as e:
-    await update.message.reply_text(f"❌ Ошибка: {str(e)}")
+    """Команда /testreport — тестовая отправка отчёта (только админ)"""
+    if update.effective_user.id != ADMIN_ID:
+        await update.message.reply_text("❌ Эта команда только для админа")
+        return
+    
+    await update.message.reply_text(
+        "🔄 Отправляю тестовый отчёт...\n"
+        "(Все пользователи получат отчёт за вчера)"
+    )
+    try:
+        await send_daily_report(context)
+        await update.message.reply_text("✅ Отчёт успешно отправлен!")
+    except Exception as e:
+        await update.message.reply_text(f"❌ Ошибка: {str(e)}")
 
 # ==================== ДИАЛОГ: ДОБАВЛЕНИЕ ТРАТ ====================
 async def begin_expense(update: Update, context: ContextTypes.DEFAULT_TYPE):
