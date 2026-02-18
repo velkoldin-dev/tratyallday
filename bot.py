@@ -194,7 +194,7 @@ async def get_category(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     context.user_data.clear()
     
-        await update.message.reply_text(
+await update.message.reply_text(
     "✅ Трата добавлена! Выберите действие:",
     reply_markup=get_main_menu()
 )
