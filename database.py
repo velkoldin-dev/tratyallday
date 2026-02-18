@@ -118,6 +118,26 @@ def get_user_stats(user_id, days=1):
     
     categories = cursor.fetchall()
     
+#  Функция для получения операций
+    def get_user_operations(user_id: int, limit: int = 30) -> list:
+    """Получить последние операции пользователя"""
+    conn = sqlite3.connect('data/expenses.db')
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        SELECT date, category, amount 
+        FROM expenses 
+        WHERE user_id = ? 
+        ORDER BY date DESC, id DESC 
+        LIMIT ?
+    ''', (user_id, limit))
+    
+    operations = [dict(row) for row in cursor.fetchall()]
+    conn.close()
+    
+    return operations
+    
     # Общая сумма
     cursor.execute('''
         SELECT SUM(amount) as total
