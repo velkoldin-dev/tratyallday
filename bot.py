@@ -127,11 +127,27 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     
     await update.message.reply_text(
+        f"👋 Привет, {user.first_name}!\n\n"
+        "💰 Я помогу тебе вести учёт трат.\n"
+        "Выбери действие из меню ниже:",
+        reply_markup=get_main_menu()
+    )
+    
+    await update.message.reply_text(
         "💰 Бот учета трат\n\n"
         "Выберите действие:",
         reply_markup=get_main_menu()
     )
     return ConversationHandler.END  # ✅ Изменено: выходим из диалога
+
+async def begin_expense(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Начало диалога добавления траты"""
+    await update.message.reply_text(
+        "💰 Введите сумму траты (только число, например: 1200):",
+        reply_markup=ReplyKeyboardRemove()
+    )
+    return AMOUNT
+    
 async def get_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Получаем сумму траты от пользователя"""
     try:
@@ -303,12 +319,8 @@ async def menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик кнопок главного меню"""
     text = update.message.text
     
-    if text == "💸 Добавить траты":
-        await update.message.reply_text(
-            "💰 Введите сумму траты (только число, например: 1200):",
-            reply_markup=ReplyKeyboardRemove()
-        )
-        return AMOUNT
+if text == "💸 Добавить траты":
+    return await begin_expense(update, context)
     
     elif text == "📈 Статистика":
         await stats_command(update, context)
@@ -337,13 +349,44 @@ def main():
         send_daily_report,
         time=time(hour=(9 - TIMEZONE_OFFSET) % 24, minute=0)
     )
+def main():
+    """Основная функция запуска бота"""
+    init_database()
+    
+    application = Application.builder().token(BOT_TOKEN).build()
+    
+    # ✅ ПЛАНИРОВЩИК ЕЖЕДНЕВНЫХ ОТЧЁТОВ
+    job_queue = application.job_queue
+    job_queue.run_daily(
+        send_daily_report,
+        time=time(hour=(9 - TIMEZONE_OFFSET) % 24, minute=0)
+    )
+    
+    # ✅ Команда /start (вне диалога)
+    application.add_handler(CommandHandler("start", start))
     
     # Диалог добавления трат
     conv_handler = ConversationHandler(
         entry_points=[
-            CommandHandler('start', start),
-            MessageHandler(filters.Regex("^💸 Добавить траты$"), menu_handler),
+            MessageHandler(filters.Regex("^💸 Добавить траты$"), begin_expense),
         ],
+        states={
+            AMOUNT: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_amount)],
+            CATEGORY: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_category)],
+        },
+        fallbacks=[
+            CommandHandler('cancel', cancel),
+            CommandHandler('help', help_command),
+            CommandHandler('stats', stats_command),
+            CommandHandler('myid', myid_command),
+        ],
+    )
+
+    # Диалог добавления трат
+conv_handler = ConversationHandler(
+    entry_points=[
+        MessageHandler(filters.Regex("^💸 Добавить траты$"), begin_expense),  # ✅ Напрямую
+    ],
         states={
             AMOUNT: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_amount)],
             CATEGORY: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_category)],
