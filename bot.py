@@ -341,35 +341,36 @@ def main():
     
     # Диалог добавления трат
     conv_handler = ConversationHandler(
-    entry_points=[
-        CommandHandler('start', start),
-        MessageHandler(filters.Regex("^💸 Добавить траты$"), menu_handler),  # ✅ Добавлено
-    ],
-    states={
-        AMOUNT: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_amount)],
-        CATEGORY: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_category)],
-    },
-    fallbacks=[
-        CommandHandler('cancel', cancel),
-        CommandHandler('help', help_command),
-        CommandHandler('stats', stats_command),
-        CommandHandler('myid', myid_command),
-    ],
-)
+        entry_points=[
+            CommandHandler('start', start),
+            MessageHandler(filters.Regex("^💸 Добавить траты$"), menu_handler),
+        ],
+        states={
+            AMOUNT: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_amount)],
+            CATEGORY: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_category)],
+        },
+        fallbacks=[
+            CommandHandler('cancel', cancel),
+            CommandHandler('help', help_command),
+            CommandHandler('stats', stats_command),
+            CommandHandler('myid', myid_command),
+        ],
+    )
     
     # Регистрация обработчиков
     application.add_handler(conv_handler)
-# Обработчик кнопок меню (вне диалога)
-application.add_handler(MessageHandler(
-    filters.Regex("^(📊 Статистика|📋 Операции)$"), 
-    menu_handler
-))
-        application.add_handler(CommandHandler("help", help_command))
+    
+    # Обработчик кнопок меню (вне диалога)
+    application.add_handler(MessageHandler(
+        filters.Regex("^(📈 Статистика|📄 Операции)$"),  # ✅ Исправлены эмодзи
+        menu_handler
+    ))
+    
+    application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("stats", stats_command))
     application.add_handler(CommandHandler("myid", myid_command))
     application.add_handler(CommandHandler("users", users_command))
     application.add_handler(CommandHandler("testreport", test_report_command))
-
     
     logger.info("=" * 50)
     logger.info("🤖 Бот учета трат запущен!")
