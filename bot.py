@@ -24,7 +24,7 @@ ADMIN_ID = int(os.environ.get("ADMIN_ID", 37888528))
 
 Логирование
 logging.basicConfig(
-format=‘%(asctime)s - %(name)s - %(levelname)s - %(message)s’,
+format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
 level=logging.INFO
 )
 logger = logging.getLogger(name)
@@ -63,7 +63,7 @@ return dt.strftime("%d.%m")
 
 def clean_category(category: str) -> str:
 """Убирает эмодзи из названия категории"""
-return category.split(’ ‘, 1)[1] if ’ ‘ in category else category
+return category.split(' ', 1)[1] if ' ' in category else category
 
 def get_main_menu():
 """Клавиатура главного меню"""
