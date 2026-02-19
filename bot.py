@@ -461,7 +461,7 @@ def main():
     application.add_handler(InlineQueryHandler(inline_query_handler))
     
     logger.info("=" * 50)
-    logger.info("🤖 Бот учета трат запущен!")
+    logger.info("🤖 Бот учета трат запущен! v2.1 COFFEE UPDATE")
     logger.info("⏰ Ежедневные отчеты: 9:00 по Москве")
     logger.info("💾 База данных: PostgreSQL")
     logger.info("🔧 Доступна команда /fix для исправления трат")
