@@ -1,14 +1,12 @@
 import logging
 import asyncio
-from datetime import datetime, timedelta, time
-from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove
-from telegram.ext import (
-Application, CommandHandler, MessageHandler,
-ConversationHandler, filters, ContextTypes
-)
 import os
-from telegram.ext import InlineQueryHandler
-from coffee_index import calculate_coffee_index, generate_coffee_image
+from datetime import datetime, timedelta, time
+from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import (
+    Application, CommandHandler, MessageHandler,
+    ConversationHandler, filters, ContextTypes, InlineQueryHandler
+)
 from database import (
     init_database, add_or_update_user, get_all_users,
     save_expense, get_user_stats, get_user_operations,
@@ -16,7 +14,7 @@ from database import (
 )
 
 # ==================== НАСТРОЙКИ ====================
-# Переменные окружения
+
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
 if not BOT_TOKEN:
     raise ValueError("❌ Установите BOT_TOKEN в Railway Variables")
@@ -24,22 +22,117 @@ if not BOT_TOKEN:
 TIMEZONE_OFFSET = int(os.environ.get("TIMEZONE_OFFSET", 3))
 ADMIN_ID = int(os.environ.get("ADMIN_ID", 37888528))
 
-# Логирование
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO
 )
 logger = logging.getLogger(__name__)
 
-# ==================== СОСТОЯНИЯ ДИАЛОГОВ ====================
-# Диалог добавления трат
-AMOUNT, CATEGORY = range(2)
+# ==================== ГЕНЕРАЦИЯ ИНДЕКСА КОФЕ ====================
 
-# Диалог исправления трат
+from PIL import Image, ImageDraw, ImageFont
+import random
+
+COFFEE_DIR = "coffee_templates"
+COFFEE_PRICE = 213
+
+def get_random_coffee_template():
+    """Выбирает случайную картинку с кофе"""
+    if not os.path.exists(COFFEE_DIR):
+        raise FileNotFoundError(f"❌ Папка {COFFEE_DIR} не найдена!")
+
+    templates = [f for f in os.listdir(COFFEE_DIR) if f.lower().endswith(('.jpg', '.png', '.jpeg'))]
+    if not templates:
+        raise FileNotFoundError(f"❌ Нет картинок в папке {COFFEE_DIR}/")
+
+    return os.path.join(COFFEE_DIR, random.choice(templates))
+
+def get_coffee_emoji(cups: int) -> str:
+    """Возвращает эмодзи в зависимости от количества чашек"""
+    if cups <= 10:
+        return "❤️"
+    elif cups <= 50:
+        return "👍"
+    elif cups <= 100:
+        return "🤯"
+    else:
+        return "😱"
+
+def calculate_coffee_index(amount: float) -> dict:
+    """Рассчитывает индекс кофе"""
+    cups = round(amount / COFFEE_PRICE)
+    emoji = get_coffee_emoji(cups)
+
+    return {
+        'cups': cups,
+        'emoji': emoji,
+        'amount': amount
+    }
+
+def generate_coffee_image(date: str, cups: int, emoji: str, output_path: str = "coffee_output.jpg") -> str:
+    """Генерирует картинку с индексом кофе"""
+    try:
+        template_path = get_random_coffee_template()
+        logger.info(f"☕ Используется шаблон: {template_path}")
+
+        img = Image.open(template_path).convert("RGB")
+        draw = ImageDraw.Draw(img)
+
+        width, height = img.size
+
+        title_font_size = int(height * 0.08)
+        cups_font_size = int(height * 0.15)
+
+        try:
+            title_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", title_font_size)
+            cups_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", cups_font_size)
+        except:
+            title_font = ImageFont.load_default()
+            cups_font = ImageFont.load_default()
+            logger.warning("⚠️ Используется стандартный шрифт")
+
+        title_text = f"Твои траты за {date}"
+        main_text = f"{cups} чашек кофе {emoji}"
+
+        y_title = height * 0.1
+        y_main = height * 0.4
+
+        # Заголовок
+        bbox = draw.textbbox((0, 0), title_text, font=title_font)
+        text_width = bbox[2] - bbox[0]
+        x_title = (width - text_width) / 2
+
+        for adj in range(-2, 3):
+            for adj_y in range(-2, 3):
+                draw.text((x_title + adj, y_title + adj_y), title_text, font=title_font, fill="black")
+        draw.text((x_title, y_title), title_text, font=title_font, fill="white")
+
+        # Основной текст
+        bbox = draw.textbbox((0, 0), main_text, font=cups_font)
+        text_width = bbox[2] - bbox[0]
+        x_main = (width - text_width) / 2
+
+        for adj in range(-3, 4):
+            for adj_y in range(-3, 4):
+                draw.text((x_main + adj, y_main + adj_y), main_text, font=cups_font, fill="black")
+        draw.text((x_main, y_main), main_text, font=cups_font, fill="white")
+
+        img.save(output_path, quality=95)
+        logger.info(f"✅ Картинка сгенерирована: {output_path}")
+
+        return output_path
+
+    except Exception as e:
+        logger.error(f"❌ Ошибка генерации: {e}")
+        raise
+
+# ==================== СОСТОЯНИЯ ДИАЛОГОВ ====================
+
+AMOUNT, CATEGORY = range(2)
 FIX_SELECT, FIX_ACTION, FIX_AMOUNT, FIX_CATEGORY = range(2, 6)
-COFFEE_INDEX = range(6, 7)  # Состояние для индекса кофе
 
 # ==================== КАТЕГОРИИ ====================
+
 CATEGORIES = [
     ["🛒 Супермаркеты и продукты питания"],
     ["🍽️ Рестораны и кафе"],
@@ -53,6 +146,7 @@ CATEGORIES = [
 ]
 
 # ==================== УТИЛИТЫ ====================
+
 def get_moscow_time():
     """Возвращает текущее время по Москве"""
     from datetime import timezone
@@ -73,110 +167,47 @@ def get_main_menu():
     keyboard = [
         ["💸 Добавить траты"],
         ["📈 Статистика", "📄 Операции"],
-        ["☕ Индекс кофе"]  # ✅ Временно для теста
+        ["☕ Индекс кофе"]
     ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
-async def coffee_test_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Тестовая команда для индекса кофе"""
-    user_id = update.effective_user.id
-    
-    # Берём статистику за сегодня (0 дней)
-    stats = get_user_stats(user_id, days=0)
-    
-    if not stats['has_data']:
-        await update.message.reply_text(
-            "☕ Нет трат за сегодня! Добавь траты сначала.",
-            reply_markup=get_main_menu()
-        )
-        return
-    
-    try:
-        from coffee_index import calculate_coffee_index, generate_coffee_image
-        from datetime import datetime
-        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-        
-        # Рассчитываем индекс кофе
-        coffee_data = calculate_coffee_index(stats['total'])
-        
-        await update.message.reply_text("⏳ Готовлю индекс кофе...")
-        
-        # Генерируем картинку
-        today = datetime.now().strftime("%d.%m")
-        
-        image_path = generate_coffee_image(
-            date=today,
-            cups=coffee_data['cups'],
-            emoji=coffee_data['emoji']
-        )
-        
-        # Отправляем картинку
-        share_button = InlineKeyboardButton(
-            "📤 Поделиться",
-            switch_inline_query=f"Слежу за тратами в боте @tratyallday_bot и вот что он мне рассказал 😄"
-        )
-        inline_keyboard = InlineKeyboardMarkup([[share_button]])
-        
-        with open(image_path, 'rb') as photo:
-            await update.message.reply_photo(
-                photo=photo,
-                caption=f"☕ Твои траты за {today} = {coffee_data['cups']} чашек кофе {coffee_data['emoji']}",
-                reply_markup=inline_keyboard
-            )
-        
-        await update.message.reply_text(
-            "Выбери действие:",
-            reply_markup=get_main_menu()
-        )
-        
-        os.remove(image_path)
-        logger.info(f"✅ Тестовый индекс кофе отправлен")
-        
-    except Exception as e:
-        logger.error(f"❌ Ошибка генерации индекса кофе: {e}")
-        logger.exception("Traceback:")
-        await update.message.reply_text(
-            f"❌ Ошибка: {str(e)}",
-            reply_markup=get_main_menu()
-        )
-
 # ==================== ЕЖЕДНЕВНЫЙ ОТЧЁТ ====================
+
 async def send_daily_report(context: ContextTypes.DEFAULT_TYPE):
     """Отправляет ежедневный отчёт всем пользователям в 9:00 МСК"""
     users = get_all_users()
-    
+
     if not users:
         logger.info("📭 Нет пользователей для отчёта")
         return
-    
+
     logger.info(f"📨 Начинаю рассылку отчётов для {len(users)} пользователей")
-    
+
     for user in users:
         user_id = user['user_id']
         first_name = user['first_name']
-        
+
         stats = get_user_stats(user_id, days=1)
-        
+
         if stats['has_data']:
             top_categories = stats['categories'][:3]
             categories_text = "\n".join(
                 f"• {cat['category']}: {cat['total']:.2f} руб."
                 for cat in top_categories
             )
-            
+
             message = (
                 f"☀️ Доброе утро, {first_name}!\n\n"
                 f"📊 Вчера ты потратил: {stats['total']:.2f} руб.\n\n"
                 f"🏆 Топ категории:\n{categories_text}"
             )
-            
-            # Кнопки: Индекс кофе + Главное меню
+
             keyboard = [
                 ["☕ Индекс кофе"],
                 ["🔙 Главное меню"]
             ]
             reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-            
+
         else:
             message = (
                 f"☀️ Доброе утро, {first_name}!\n\n"
@@ -184,7 +215,7 @@ async def send_daily_report(context: ContextTypes.DEFAULT_TYPE):
                 f"Отличный день для экономии! 💪"
             )
             reply_markup = get_main_menu()
-        
+
         try:
             await context.bot.send_message(
                 chat_id=user_id, 
@@ -194,10 +225,11 @@ async def send_daily_report(context: ContextTypes.DEFAULT_TYPE):
             logger.info(f"✅ Отчёт отправлен пользователю {user_id}")
         except Exception as e:
             logger.error(f"❌ Ошибка отправки пользователю {user_id}: {e}")
-        
+
         await asyncio.sleep(0.5)
 
 # ==================== КОМАНДЫ ====================
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Команда /start — приветствие и главное меню"""
     user = update.effective_user
@@ -206,14 +238,13 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         username=user.username,
         first_name=user.first_name
     )
-    
-    # ✅ ОТЛАДКА: проверяем файлы
-    import os
+
+    # Отладка файловой системы
     logger.info("=" * 50)
     logger.info("🔍 ПРОВЕРКА ФАЙЛОВОЙ СИСТЕМЫ:")
     logger.info(f"📂 Текущая директория: {os.getcwd()}")
     logger.info(f"📄 Содержимое корня: {os.listdir('.')}")
-    
+
     if os.path.exists('coffee_templates'):
         coffee_files = os.listdir('coffee_templates')
         logger.info(f"✅ Папка coffee_templates найдена!")
@@ -221,14 +252,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.info(f"📄 Список: {coffee_files}")
     else:
         logger.error("❌ Папка coffee_templates НЕ НАЙДЕНА!")
-    
-    if os.path.exists('coffee_index.py'):
-        logger.info("✅ Файл coffee_index.py найден!")
-    else:
-        logger.error("❌ Файл coffee_index.py НЕ НАЙДЕН!")
-    
+
     logger.info("=" * 50)
-    
+
     await update.message.reply_text(
         f"👋 Привет, {user.first_name}!\n\n"
         "💰 Я помогу тебе вести учёт трат.\n"
@@ -243,7 +269,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "📌 /start - главное меню\n"
         "📌 /stats - статистика за сегодня\n"
         "📌 /fix - исправить последние траты\n"
-        "📌 /myid - показать ваш user\_id\n"
+        "📌 /myid - показать ваш user_id\n"
         "📌 /testreport - тестовый отчёт (только админ)\n"
         "📌 /cancel - отменить операцию\n\n"
         "Как пользоваться:\n"
@@ -251,7 +277,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "2️⃣ Введи сумму (например: 350)\n"
         "3️⃣ Выбери категорию\n\n"
         "Ежедневные отчеты:\n"
-        "📨 Каждый день в 9:00 (МСК) бот пришлёт отчёт о вчерашних тратах",
+        "📨 Каждый день в 9:00 (МСК) бот пришлёт отчёт о вчерашних тратах"
     )
 
 async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -259,30 +285,33 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     stats = get_user_stats(user_id, days=0)
     date_today = format_date()
+
     if stats['has_data']:
         top_categories = stats['categories'][:3]
         categories_text = "\n".join(
             f"• {cat['category']}: {cat['total']:.2f} руб."
             for cat in top_categories
         )
+
         message = (
-            f"📊 *Статистика за сегодня ({date_today}):*\n\n"
+            f"📊 Статистика за сегодня ({date_today}):\n\n"
             f"💰 Общие траты: {stats['total']:.2f} руб.\n\n"
             f"🏆 Топ категории:\n{categories_text}"
         )
     else:
         message = (
-            f"📊 *Статистика за сегодня ({date_today}):*\n\n"
+            f"📊 Статистика за сегодня ({date_today}):\n\n"
             f"💰 Общие траты: 0 руб.\n\n"
             f"Пока нет трат. Используй кнопку «💸 Добавить траты»"
         )
+
     await update.message.reply_text(message)
 
 async def operations_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Команда /operations — показать последние 30 трат"""
     user_id = update.effective_user.id
     operations = get_user_operations(user_id, limit=30)
-    
+
     if not operations:
         await update.message.reply_text(
             "📭 У вас пока нет операций.\n"
@@ -290,65 +319,128 @@ async def operations_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
             reply_markup=get_main_menu()
         )
         return
-    
-    # Формируем список операций
+
     message = "📋 Последние 30 операций:\n\n"
     for op in operations:
         message += f"• {op['date']} | {op['category']} | {op['amount']:.2f} руб.\n"
-    
-    # Добавляем кнопку "Редактировать"
+
     keyboard = [
         ["🔧 Редактировать"],
         ["🔙 Главное меню"]
     ]
-    
+
     await update.message.reply_text(
         message, 
         reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
     )
 
+
 async def myid_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Команда /myid — показать user_id"""
     user_id = update.effective_user.id
     await update.message.reply_text(
-        f"📋 Ваш user\_id: {user_id}",
+        f"📋 Ваш user_id: {user_id}"
     )
+
 
 async def users_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Команда /users — список всех пользователей (только админ)"""
     if update.effective_user.id != ADMIN_ID:
         await update.message.reply_text("❌ Эта команда только для админа")
         return
-    
+
     users = get_all_users()
     if not users:
         await update.message.reply_text("📭 Пользователей пока нет")
         return
-    
-    message = "👥 *Список пользователей:*\n\n"
+
+    message = "👥 Список пользователей:\n\n"
     for user in users:
         username = user['username'] or 'нет username'
-        message += f"• {user['first_name']} (@{username}) - `{user['user_id']}`\n"
-    
+        message += f"• {user['first_name']} (@{username}) - {user['user_id']}\n"
+
     await update.message.reply_text(message)
+
 
 async def test_report_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Команда /testreport — тестовая отправка отчёта (только админ)"""
     if update.effective_user.id != ADMIN_ID:
         await update.message.reply_text("❌ Эта команда только для админа")
         return
-    
+
     await update.message.reply_text(
         "🔄 Отправляю тестовый отчёт...\n"
         "(Все пользователи получат отчёт за вчера)"
     )
+
     try:
         await send_daily_report(context)
         await update.message.reply_text("✅ Отчёт успешно отправлен!")
     except Exception as e:
         await update.message.reply_text(f"❌ Ошибка: {str(e)}")
+        logger.error(f"Ошибка в test_report_command: {e}")
+
+
+async def coffee_test_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Тестовая команда для индекса кофе"""
+    logger.info("🧪 КОМАНДА /coffeetest ВЫЗВАНА!")
+    user_id = update.effective_user.id
+
+    stats = get_user_stats(user_id, days=0)
+    logger.info(f"📊 Статистика: {stats}")
+
+    if not stats['has_data']:
+        await update.message.reply_text(
+            "☕ Нет трат за сегодня! Добавь траты сначала.",
+            reply_markup=get_main_menu()
+        )
+        return
+
+    try:
+        coffee_data = calculate_coffee_index(stats['total'])
+
+        await update.message.reply_text("⏳ Готовлю индекс кофе...")
+
+        today = datetime.now().strftime("%d.%m")
+
+        image_path = generate_coffee_image(
+            date=today,
+            cups=coffee_data['cups'],
+            emoji=coffee_data['emoji']
+        )
+
+        share_button = InlineKeyboardButton(
+            "📤 Поделиться",
+            switch_inline_query=f"Слежу за тратами в боте @tratyallday_bot и вот что он мне рассказал 😄"
+        )
+        inline_keyboard = InlineKeyboardMarkup([[share_button]])
+
+        with open(image_path, 'rb') as photo:
+            await update.message.reply_photo(
+                photo=photo,
+                caption=f"☕ Твои траты за {today} = {coffee_data['cups']} чашек кофе {coffee_data['emoji']}",
+                reply_markup=inline_keyboard
+            )
+
+        await update.message.reply_text(
+            "Выбери действие:",
+            reply_markup=get_main_menu()
+        )
+
+        os.remove(image_path)
+        logger.info(f"✅ Тестовый индекс кофе отправлен")
+
+    except Exception as e:
+        logger.error(f"❌ Ошибка генерации индекса кофе: {e}")
+        logger.exception("Traceback:")
+        await update.message.reply_text(
+            f"❌ Ошибка: {str(e)}",
+            reply_markup=get_main_menu()
+        )
+
 
 # ==================== ДИАЛОГ: ДОБАВЛЕНИЕ ТРАТ ====================
+
 async def begin_expense(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Начало диалога добавления траты"""
     user = update.effective_user
@@ -357,21 +449,25 @@ async def begin_expense(update: Update, context: ContextTypes.DEFAULT_TYPE):
         username=user.username,
         first_name=user.first_name
     )
-    
+
     await update.message.reply_text(
         "💰 Введи сумму траты (только число, например: 1200):",
         reply_markup=ReplyKeyboardRemove()
     )
     return AMOUNT
 
+
 async def get_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик ввода суммы"""
     text = update.message.text.strip()
+
     try:
         amount = float(text.replace(',', '.'))
         if amount <= 0:
             raise ValueError("Сумма должна быть положительной")
+
         context.user_data['amount'] = amount
+
         await update.message.reply_text(
             f"💵 Сумма: {amount:.2f} руб.\n"
             "Выбери категорию:",
@@ -382,6 +478,7 @@ async def get_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
         )
         return CATEGORY
+
     except ValueError:
         await update.message.reply_text(
             "❌ Неверный формат! Введи число (например: 500 или 75.50):",
@@ -389,22 +486,23 @@ async def get_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return AMOUNT
 
+
 async def get_category(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик выбора категории и сохранение траты"""
     category = update.message.text
     amount = context.user_data.get('amount', 0)
     user_id = update.effective_user.id
-    
+
     date_today = format_date()
     clean_cat = clean_category(category)
-    
+
     success = save_expense(
         user_id=user_id,
         amount=amount,
         category=clean_cat,
         date=date_today
     )
-    
+
     if success:
         await update.message.reply_text(
             f"✅ Запись добавлена!\n\n"
@@ -418,9 +516,10 @@ async def get_category(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "❌ Ошибка при сохранении! Попробуй еще раз.",
             reply_markup=get_main_menu()
         )
-    
+
     context.user_data.clear()
     return ConversationHandler.END
+
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Отмена любого диалога"""
@@ -431,81 +530,76 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.clear()
     return ConversationHandler.END
 
+
 # ==================== ИНДЕКС КОФЕ ====================
+
 async def coffee_index_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик кнопки 'Индекс кофе'"""
     user_id = update.effective_user.id
-    
-    # Получаем статистику за вчера
+
     stats = get_user_stats(user_id, days=1)
-    
+
     if not stats['has_data']:
         await update.message.reply_text(
             "☕ У тебя не было трат вчера, поэтому индекс кофе равен 0!",
             reply_markup=get_main_menu()
         )
         return ConversationHandler.END
-    
+
     try:
-        # Рассчитываем индекс кофе
         coffee_data = calculate_coffee_index(stats['total'])
-        
+
         await update.message.reply_text(
             "⏳ Готовлю индекс кофе...",
             reply_markup=ReplyKeyboardRemove()
         )
-        
-        # Генерируем картинку
-        from datetime import datetime, timedelta
+
         yesterday = (datetime.now() - timedelta(days=1)).strftime("%d.%m")
-        
+
         image_path = generate_coffee_image(
             date=yesterday,
             cups=coffee_data['cups'],
             emoji=coffee_data['emoji']
         )
-        
-        # Отправляем картинку с inline-кнопкой "Поделиться"
-        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-        
+
         share_button = InlineKeyboardButton(
             "📤 Поделиться",
             switch_inline_query=f"Слежу за тратами в боте @tratyallday_bot и вот что он мне рассказал 😄"
         )
         inline_keyboard = InlineKeyboardMarkup([[share_button]])
-        
+
         with open(image_path, 'rb') as photo:
             await update.message.reply_photo(
                 photo=photo,
                 caption=f"☕ Твои траты за {yesterday} = {coffee_data['cups']} чашек кофе {coffee_data['emoji']}",
                 reply_markup=inline_keyboard
             )
-        
-        # Возвращаем главное меню
+
         await update.message.reply_text(
             "Выбери действие:",
             reply_markup=get_main_menu()
         )
-        
-        # Удаляем временный файл
+
         os.remove(image_path)
         logger.info(f"✅ Индекс кофе отправлен пользователю {user_id}")
-        
+
     except Exception as e:
         logger.error(f"❌ Ошибка генерации индекса кофе: {e}")
         await update.message.reply_text(
             "❌ Ошибка генерации. Попробуй позже!",
             reply_markup=get_main_menu()
         )
-    
+
     return ConversationHandler.END
 
+
 # ==================== ДИАЛОГ: ИСПРАВЛЕНИЕ ТРАТ (/fix) ====================
+
 async def fix_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Команда /fix или кнопка Редактировать — показать последние 5 трат"""
     user_id = update.effective_user.id
     operations = get_user_operations(user_id, limit=5)
-    
+
     if not operations:
         await update.message.reply_text(
             "📭 У тебя пока нет трат для исправления.\n"
@@ -513,47 +607,45 @@ async def fix_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=get_main_menu()
         )
         return ConversationHandler.END
-    
-    # Сохраняем список операций в контекст
+
     context.user_data['fix_operations'] = operations
-    
-    # Формируем сообщение со списком
+
     message = "🔧 Последние 5 трат:\n\n"
     for idx, op in enumerate(operations, start=1):
         message += (
             f"{idx}. {op['date']} | {op['category']} | "
             f"{op['amount']:.2f} руб.\n"
         )
-    
+
     message += "\n💬 Введи номер траты (1-5):"
-    
+
     await update.message.reply_text(
         message,
         reply_markup=ReplyKeyboardRemove()
     )
     return FIX_SELECT
+
+
 async def fix_select_expense(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик выбора номера траты"""
     text = update.message.text.strip()
-    
+
     try:
         number = int(text)
         operations = context.user_data.get('fix_operations', [])
-        
+
         if number < 1 or number > len(operations):
             raise ValueError("Неверный номер")
-        
-        # Сохраняем выбранную трату
+
         selected = operations[number - 1]
         context.user_data['selected_expense'] = selected
-        
-        # Показываем кнопки действий
+
         keyboard = [
             ["🔄 Перезаписать"],
             ["🗑️ Удалить"],
             ["❌ Отмена"]
         ]
-        
+
         await update.message.reply_text(
             f"✅ Выбрана трата:\n\n"
             f"📅 {selected['date']}\n"
@@ -563,7 +655,7 @@ async def fix_select_expense(update: Update, context: ContextTypes.DEFAULT_TYPE)
             reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
         )
         return FIX_ACTION
-        
+
     except (ValueError, IndexError):
         await update.message.reply_text(
             "❌ Неверный номер! Введи число от 1 до 5:",
@@ -575,7 +667,6 @@ async def fix_action_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
     """Обработчик выбора действия (Удалить/Перезаписать/Отмена)"""
     action = update.message.text
     
-    # ========== ОТМЕНА ==========
     if action == "❌ Отмена":
         await update.message.reply_text(
             "❌ Операция отменена.",
@@ -584,7 +675,6 @@ async def fix_action_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
         context.user_data.clear()
         return ConversationHandler.END
     
-    # ========== УДАЛИТЬ ==========
     elif action == "🗑️ Удалить":
         selected = context.user_data.get('selected_expense')
         
@@ -596,7 +686,6 @@ async def fix_action_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
             context.user_data.clear()
             return ConversationHandler.END
         
-        # Удаляем из БД
         success = delete_expense(selected['id'])
         
         if success:
@@ -616,7 +705,6 @@ async def fix_action_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
         context.user_data.clear()
         return ConversationHandler.END
     
-    # ========== ПЕРЕЗАПИСАТЬ ==========
     elif action == "🔄 Перезаписать":
         await update.message.reply_text(
             "💰 Введи новую сумму траты (например: 1200):",
@@ -624,7 +712,6 @@ async def fix_action_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
         )
         return FIX_AMOUNT
     
-    # ========== НЕВЕРНАЯ КОМАНДА ==========
     else:
         keyboard = [
             ["🔄 Перезаписать"],
@@ -681,10 +768,8 @@ async def fix_get_new_category(update: Update, context: ContextTypes.DEFAULT_TYP
     
     clean_cat = clean_category(category)
     
-    # Удаляем старую запись
     delete_expense(selected['id'])
     
-    # Добавляем новую
     date_today = format_date()
     success = save_expense(
         user_id=user_id,
@@ -709,7 +794,6 @@ async def fix_get_new_category(update: Update, context: ContextTypes.DEFAULT_TYP
     
     context.user_data.clear()
     return ConversationHandler.END
-
 # ==================== ОБРАБОТЧИК ГЛАВНОГО МЕНЮ ====================
 async def menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик кнопок главного меню"""
@@ -726,7 +810,7 @@ async def menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await operations_command(update, context)
         return ConversationHandler.END
     
-    elif text == "☕ Индекс кофе":  # ✅ Добавлено
+    elif text == "☕ Индекс кофе":
         return await coffee_index_handler(update, context)
     
     elif text == "🔙 Главное меню":
@@ -742,7 +826,6 @@ async def menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=get_main_menu()
         )
         return ConversationHandler.END
-
 # ==================== ГЛАВНАЯ ФУНКЦИЯ ====================
 def main():
     """Основная функция запуска бота"""
@@ -784,8 +867,8 @@ def main():
     conv_handler_fix = ConversationHandler(
         entry_points=[
             CommandHandler("fix", fix_start),
-            MessageHandler(filters.Regex("^🔧 Редактировать$"), fix_start),  # ✅ Добавлено
-    ],
+            MessageHandler(filters.Regex("^🔧 Редактировать$"), fix_start),
+        ],
         states={
             FIX_SELECT: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, fix_select_expense)
@@ -808,15 +891,20 @@ def main():
     # ========== РЕГИСТРАЦИЯ ОБРАБОТЧИКОВ ==========
     application.add_handler(conv_handler_expense)
     application.add_handler(conv_handler_fix)
-    # ========== РЕГИСТРАЦИЯ ОБРАБОТЧИКОВ ==========
-    application.add_handler(conv_handler_expense)
-    application.add_handler(conv_handler_fix)
     
     # Обработчик кнопок меню (вне диалогов)
     application.add_handler(MessageHandler(
-    filters.Regex("^(📈 Статистика|📄 Операции|☕ Индекс кофе|🔙 Главное меню)$"),
-    menu_handler
+        filters.Regex("^(📈 Статистика|📄 Операции|☕ Индекс кофе|🔙 Главное меню)$"),
+        menu_handler
     ))
+    
+    # ========== INLINE-РЕЖИМ ДЛЯ ШАРИНГА ==========
+    async def inline_query_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Обработчик inline-запросов для кнопки Поделиться"""
+        results = []
+        await update.inline_query.answer(results, cache_time=0)
+    
+    application.add_handler(InlineQueryHandler(inline_query_handler))
     
     # ========== ЗАПУСК БОТА ==========
     logger.info("=" * 50)
@@ -824,20 +912,8 @@ def main():
     logger.info("⏰ Ежедневные отчеты: 9:00 по Москве")
     logger.info("💾 База данных: PostgreSQL")
     logger.info("🔧 Доступна команда /fix для исправления трат")
+    logger.info("☕ Доступна функция 'Индекс кофе'")
     logger.info("=" * 50)
-
-    # ========== INLINE-РЕЖИМ ДЛЯ ШАРИНГА ==========
-    from telegram import InlineQueryResultPhoto
-    
-    async def inline_query_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Обработчик inline-запросов для кнопки Поделиться"""
-        query = update.inline_query.query
-        
-        # Заглушка: возвращаем пустой результат (картинка уже отправлена)
-        results = []
-        await update.inline_query.answer(results, cache_time=0)
-    
-    application.add_handler(InlineQueryHandler(inline_query_handler))
     
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 if __name__ == '__main__':
