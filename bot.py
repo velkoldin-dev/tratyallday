@@ -68,17 +68,11 @@ def generate_coffee_image(date: str, cups: int, emoji: str, output_path: str = "
         font = ImageFont.truetype(font_path, font_size)
         logger.info(f"✅ Arial загружен из репозитория")
         
-        # Позиция: СВЕРХУ (y=160)
+        # Позиция: СВЕРХУ (y=145)
         bbox = draw.textbbox((0, 0), text, font=font)
         text_width = bbox[2] - bbox[0]
         x = (1000 - text_width) / 2
-        y = 160
-        
-        # Черная обводка
-        for dx in range(-3, 4):
-            for dy in range(-3, 4):
-                if dx*dx + dy*dy <= 9:
-                    draw.text((x + dx, y + dy), text, font=font, fill="black")
+        y = 145
         
         # Черный текст
         draw.text((x, y), text, font=font, fill="black")
