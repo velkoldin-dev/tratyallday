@@ -7,12 +7,13 @@ Application, CommandHandler, MessageHandler,
 ConversationHandler, filters, ContextTypes
 )
 import os
+from telegram.ext import InlineQueryHandler
+from coffee_index import calculate_coffee_index, generate_coffee_image
 from database import (
     init_database, add_or_update_user, get_all_users,
     save_expense, get_user_stats, get_user_operations,
     delete_expense, get_expense_by_id
 )
-from meme_generator import create_meme_for_stats
 
 # ==================== НАСТРОЙКИ ====================
 # Переменные окружения
@@ -36,7 +37,7 @@ AMOUNT, CATEGORY = range(2)
 
 # Диалог исправления трат
 FIX_SELECT, FIX_ACTION, FIX_AMOUNT, FIX_CATEGORY = range(2, 6)
-MEME_CHOICE = range(6, 7)  # Состояние выбора Сумма/Категория
+COFFEE_INDEX = range(6, 7)  # Состояние для индекса кофе
 
 # ==================== КАТЕГОРИИ ====================
 CATEGORIES = [
@@ -102,14 +103,13 @@ async def send_daily_report(context: ContextTypes.DEFAULT_TYPE):
             message = (
                 f"☀️ Доброе утро, {first_name}!\n\n"
                 f"📊 Вчера ты потратил: {stats['total']:.2f} руб.\n\n"
-                f"🏆 Топ категории:\n{categories_text}\n\n"
-                f"😄 Хочешь я сделаю мем на основе этих данных?\n"
-                f"Если понравится – отправишь друзьям повеселиться!"
+                f"🏆 Топ категории:\n{categories_text}"
             )
             
-            # Кнопки для генерации мема
+            # Кнопки: Индекс кофе + Главное меню
             keyboard = [
-                ["🔥 Жги!", "❌ Не хочу"]
+                ["☕ Индекс кофе"],
+                ["🔙 Главное меню"]
             ]
             reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
             
@@ -344,6 +344,75 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.clear()
     return ConversationHandler.END
 
+# ==================== ИНДЕКС КОФЕ ====================
+async def coffee_index_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработчик кнопки 'Индекс кофе'"""
+    user_id = update.effective_user.id
+    
+    # Получаем статистику за вчера
+    stats = get_user_stats(user_id, days=1)
+    
+    if not stats['has_data']:
+        await update.message.reply_text(
+            "☕ У тебя не было трат вчера, поэтому индекс кофе равен 0!",
+            reply_markup=get_main_menu()
+        )
+        return ConversationHandler.END
+    
+    try:
+        # Рассчитываем индекс кофе
+        coffee_data = calculate_coffee_index(stats['total'])
+        
+        await update.message.reply_text(
+            "⏳ Готовлю индекс кофе...",
+            reply_markup=ReplyKeyboardRemove()
+        )
+        
+        # Генерируем картинку
+        from datetime import datetime, timedelta
+        yesterday = (datetime.now() - timedelta(days=1)).strftime("%d.%m")
+        
+        image_path = generate_coffee_image(
+            date=yesterday,
+            cups=coffee_data['cups'],
+            emoji=coffee_data['emoji']
+        )
+        
+        # Отправляем картинку с inline-кнопкой "Поделиться"
+        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+        
+        share_button = InlineKeyboardButton(
+            "📤 Поделиться",
+            switch_inline_query=f"Слежу за тратами в боте @tratyallday_bot и вот что он мне рассказал 😄"
+        )
+        inline_keyboard = InlineKeyboardMarkup([[share_button]])
+        
+        with open(image_path, 'rb') as photo:
+            await update.message.reply_photo(
+                photo=photo,
+                caption=f"☕ Твои траты за {yesterday} = {coffee_data['cups']} чашек кофе {coffee_data['emoji']}",
+                reply_markup=inline_keyboard
+            )
+        
+        # Возвращаем главное меню
+        await update.message.reply_text(
+            "Выбери действие:",
+            reply_markup=get_main_menu()
+        )
+        
+        # Удаляем временный файл
+        os.remove(image_path)
+        logger.info(f"✅ Индекс кофе отправлен пользователю {user_id}")
+        
+    except Exception as e:
+        logger.error(f"❌ Ошибка генерации индекса кофе: {e}")
+        await update.message.reply_text(
+            "❌ Ошибка генерации. Попробуй позже!",
+            reply_markup=get_main_menu()
+        )
+    
+    return ConversationHandler.END
+
 # ==================== ДИАЛОГ: ИСПРАВЛЕНИЕ ТРАТ (/fix) ====================
 async def fix_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Команда /fix или кнопка Редактировать — показать последние 5 трат"""
@@ -570,6 +639,9 @@ async def menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await operations_command(update, context)
         return ConversationHandler.END
     
+    elif text == "☕ Индекс кофе":  # ✅ Добавлено
+        return await coffee_index_handler(update, context)
+    
     elif text == "🔙 Главное меню":
         await update.message.reply_text(
             "Выбери действие:",
@@ -619,100 +691,6 @@ def main():
             CommandHandler('cancel', cancel),
         ],
     )
-# ==================== ДИАЛОГ: ГЕНЕРАЦИЯ МЕМОВ ====================
-async def meme_choice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработчик кнопок Жги! / Не хочу"""
-    text = update.message.text
-    
-    if text == "❌ Не хочу":
-        await update.message.reply_text(
-            "Обращайся, как появится желание! 😊",
-            reply_markup=get_main_menu()
-        )
-        return ConversationHandler.END
-    
-    elif text == "🔥 Жги!":
-        user_id = update.effective_user.id
-        stats = get_user_stats(user_id, days=1)
-        
-        # Сохраняем статистику в контекст
-        context.user_data['meme_stats'] = stats
-        
-        keyboard = [
-            ["💰 Сумма", "📂 Категория"],
-            ["❌ Отмена"]
-        ]
-        
-        await update.message.reply_text(
-            "Выбираем общую сумму за вчера или самую дорогую категорию?",
-            reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-        )
-        return MEME_CHOICE
-    
-    else:
-        return ConversationHandler.END
-async def meme_generate(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Генерирует и отправляет мем"""
-    choice = update.message.text
-    
-    if choice == "❌ Отмена":
-        await update.message.reply_text(
-            "Отменено.",
-            reply_markup=get_main_menu()
-        )
-        context.user_data.clear()
-        return ConversationHandler.END
-    
-    stats = context.user_data.get('meme_stats', {})
-    
-    if not stats or not stats.get('has_data'):
-        await update.message.reply_text(
-            "❌ Нет данных для мема!",
-            reply_markup=get_main_menu()
-        )
-        context.user_data.clear()
-        return ConversationHandler.END
-    
-    try:
-        await update.message.reply_text(
-            "⏳ Генерирую мем...",
-            reply_markup=ReplyKeyboardRemove()
-        )
-        
-        if choice == "💰 Сумма":
-            meme_path = create_meme_for_stats(amount=stats['total'])
-        elif choice == "📂 Категория":
-            top_category = stats['categories'][0]['category']
-            meme_path = create_meme_for_stats(category=top_category)
-        else:
-            await update.message.reply_text(
-                "❌ Неверный выбор!",
-                reply_markup=get_main_menu()
-            )
-            context.user_data.clear()
-            return ConversationHandler.END
-        
-        # Отправляем мем
-        with open(meme_path, 'rb') as photo:
-            await update.message.reply_photo(
-                photo=photo,
-                caption="🎉 Твой мем готов! Отправь друзьям 😄",
-                reply_markup=get_main_menu()
-            )
-        
-        # Удаляем временный файл
-        os.remove(meme_path)
-        logger.info(f"✅ Мем отправлен пользователю {update.effective_user.id}")
-        
-    except Exception as e:
-        logger.error(f"❌ Ошибка генерации мема: {e}")
-        await update.message.reply_text(
-            "❌ Ошибка генерации мема. Попробуй позже!",
-            reply_markup=get_main_menu()
-        )
-    
-    context.user_data.clear()
-    return ConversationHandler.END
     
     # ========== ДИАЛОГ: ИСПРАВЛЕНИЕ ТРАТ (/fix) ==========
     conv_handler_fix = ConversationHandler(
@@ -738,32 +716,17 @@ async def meme_generate(update: Update, context: ContextTypes.DEFAULT_TYPE):
             CommandHandler('cancel', cancel),
         ],
     )
-    # ========== ДИАЛОГ: ГЕНЕРАЦИЯ МЕМОВ ==========
-    conv_handler_meme = ConversationHandler(
-        entry_points=[
-            MessageHandler(filters.Regex("^(🔥 Жги!|❌ Не хочу)$"), meme_choice_handler),
-        ],
-        states={
-            MEME_CHOICE: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, meme_generate)
-            ],
-        },
-        fallbacks=[
-            CommandHandler('cancel', cancel),
-        ],
-    )
     
     # ========== РЕГИСТРАЦИЯ ОБРАБОТЧИКОВ ==========
     application.add_handler(conv_handler_expense)
     application.add_handler(conv_handler_fix)
-    application.add_handler(conv_handler_meme)  # ✅ Добавлено
     # ========== РЕГИСТРАЦИЯ ОБРАБОТЧИКОВ ==========
     application.add_handler(conv_handler_expense)
     application.add_handler(conv_handler_fix)
     
     # Обработчик кнопок меню (вне диалогов)
     application.add_handler(MessageHandler(
-    filters.Regex("^(📈 Статистика|📄 Операции|🔙 Главное меню)$"),
+    filters.Regex("^(📈 Статистика|📄 Операции|☕ Индекс кофе|🔙 Главное меню)$"),
     menu_handler
     ))
     
@@ -774,6 +737,19 @@ async def meme_generate(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info("💾 База данных: PostgreSQL")
     logger.info("🔧 Доступна команда /fix для исправления трат")
     logger.info("=" * 50)
+
+    # ========== INLINE-РЕЖИМ ДЛЯ ШАРИНГА ==========
+    from telegram import InlineQueryResultPhoto
+    
+    async def inline_query_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Обработчик inline-запросов для кнопки Поделиться"""
+        query = update.inline_query.query
+        
+        # Заглушка: возвращаем пустой результат (картинка уже отправлена)
+        results = []
+        await update.inline_query.answer(results, cache_time=0)
+    
+    application.add_handler(InlineQueryHandler(inline_query_handler))
     
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 if __name__ == '__main__':
