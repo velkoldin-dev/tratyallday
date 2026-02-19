@@ -512,8 +512,8 @@ def main():
     application.add_handler(MessageHandler(filters.Regex("^(📈 Статистика|📄 Операции|☕ Индекс кофе|🔙 Главное меню)$"), menu_handler))
     
     async def inline_query_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработчик инлайн-запросов (когда жмут Поделиться)"""
-    query = update.inline_query.query
+        """Обработчик инлайн-запросов (когда жмут Поделиться)"""
+        query = update.inline_query.query
     
     # Берём сохранённый file_id
     photo_file_id = context.bot_data.get('coffee_file_id')
