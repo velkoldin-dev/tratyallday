@@ -59,7 +59,7 @@ def generate_coffee_image(date: str, cups: int, emoji: str, output_path: str = "
         draw = ImageDraw.Draw(img)
         
         # Текст одной строкой
-        text = f"Мои траты за {date} – это {cups} чашек кофе {emoji}"
+        text = f"Мои траты за {date} – это {cups} чашек кофе 😄"
         
         # 👇 ШРИФТ ИЗ GIT-репозитория
         font_path = os.path.join(os.path.dirname(__file__), "fonts", "Arial.ttf")
