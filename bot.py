@@ -206,6 +206,29 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         username=user.username,
         first_name=user.first_name
     )
+    
+    # ✅ ОТЛАДКА: проверяем файлы
+    import os
+    logger.info("=" * 50)
+    logger.info("🔍 ПРОВЕРКА ФАЙЛОВОЙ СИСТЕМЫ:")
+    logger.info(f"📂 Текущая директория: {os.getcwd()}")
+    logger.info(f"📄 Содержимое корня: {os.listdir('.')}")
+    
+    if os.path.exists('coffee_templates'):
+        coffee_files = os.listdir('coffee_templates')
+        logger.info(f"✅ Папка coffee_templates найдена!")
+        logger.info(f"📁 Файлов внутри: {len(coffee_files)}")
+        logger.info(f"📄 Список: {coffee_files}")
+    else:
+        logger.error("❌ Папка coffee_templates НЕ НАЙДЕНА!")
+    
+    if os.path.exists('coffee_index.py'):
+        logger.info("✅ Файл coffee_index.py найден!")
+    else:
+        logger.error("❌ Файл coffee_index.py НЕ НАЙДЕН!")
+    
+    logger.info("=" * 50)
+    
     await update.message.reply_text(
         f"👋 Привет, {user.first_name}!\n\n"
         "💰 Я помогу тебе вести учёт трат.\n"
