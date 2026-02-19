@@ -59,20 +59,20 @@ def generate_coffee_image(date: str, cups: int, emoji: str, output_path: str = "
         draw = ImageDraw.Draw(img)
         
         # Текст одной строкой
-        text = f"Мои траты за {date} – это {cups} чашек кофе 😄"
+        text = f"Мои траты за {date} – это {cups} чашек кофе"
         
         # 👇 ШРИФТ ИЗ GIT-репозитория
         font_path = os.path.join(os.path.dirname(__file__), "fonts", "Arial.ttf")
         
-        font_size = 42
+        font_size = 43
         font = ImageFont.truetype(font_path, font_size)
         logger.info(f"✅ Arial загружен из репозитория")
         
-        # Позиция: СВЕРХУ (y=145)
+        # Позиция: СВЕРХУ (y=140)
         bbox = draw.textbbox((0, 0), text, font=font)
         text_width = bbox[2] - bbox[0]
         x = (1000 - text_width) / 2
-        y = 145
+        y = 140
         
         # Черный текст
         draw.text((x, y), text, font=font, fill="black")
