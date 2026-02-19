@@ -545,7 +545,7 @@ def main():
             photo_file_id=photo_file_id
          )
             
-     results = [result]
+    results = [result]
     await update.inline_query.answer(results, cache_time=10)
             
             logger.info(f"✅ Inline-запрос обработан для пользователя {user_id}")
