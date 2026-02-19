@@ -499,17 +499,17 @@ def main():
     application.add_handler(conv_handler_fix)
     application.add_handler(MessageHandler(filters.Regex("^(📈 Статистика|📄 Операции|☕ Индекс кофе|🔙 Главное меню)$"), menu_handler))
     
-    async def inline_query_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработчик inline-запросов для кнопки Поделиться"""
-    query = update.inline_query.query
-    user_id = update.inline_query.from_user.id
-    
-    # Генерируем индекс кофе для пользователя
-    stats = get_user_stats(user_id, days=1)
-    
-    if not stats['has_data']:
-        # Если нет данных — возвращаем пустой результат
-        results = []
+        async def inline_query_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Обработчик inline-запросов для кнопки Поделиться"""
+        query = update.inline_query.query
+        user_id = update.inline_query.from_user.id
+        
+        # Генерируем индекс кофе для пользователя
+        stats = get_user_stats(user_id, days=1)
+        
+        if not stats['has_data']:
+            # Если нет данных — возвращаем пустой результат
+            results = []
         await update.inline_query.answer(results, cache_time=0)
         return
     
