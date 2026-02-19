@@ -61,42 +61,43 @@ def generate_coffee_image(date: str, cups: int, emoji: str, output_path: str = "
         # Текст одной строкой
         text = f"Мои траты за {date} – это {cups} чашек кофе {emoji}"
         
-        # ТОЛЬКО Arial Black (жирный, черный)
-        arial_paths = [
-            "/usr/share/fonts/truetype/msttcorefonts/Arial_Black.ttf",  # Linux
-            "/usr/share/fonts/truetype/msttcorefonts/Arial.ttf",        # запасной Arial
-            "/System/Library/Fonts/Supplemental/Arial Black.ttf",       # macOS
-            "C:\\Windows\\Fonts\\Arialbd.ttf"                           # Windows
+        # Шрифты, которые ЕСТЬ НА ВСЕХ Linux-серверах
+        font_paths = [
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",      # Есть везде
+            "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+            "/usr/share/fonts/truetype/liberation2/LiberationSans-Bold.ttf",
+            "/usr/share/fonts/truetype/noto/NotoSans-Bold.ttf",
         ]
         
         font = None
-        font_size = 42  # Можно будет подогнать
+        font_size = 45  # Можно регулировать
         
-        for path in arial_paths:
+        for path in font_paths:
             try:
                 font = ImageFont.truetype(path, font_size)
-                logger.info(f"✅ Arial загружен: {path}")
+                logger.info(f"✅ Шрифт загружен: {path}")
                 break
             except:
                 continue
         
+        # Если ничего не нашли — используем встроенный, но это риск
         if not font:
-            # Если Arial не нашелся — падаем с ошибкой
-            raise Exception("❌ Arial Black не найден на сервере!")
+            font = ImageFont.load_default()
+            logger.warning("⚠️ Используется стандартный шрифт (может не быть кириллицы)")
         
-        # Позиция: СВЕРХУ (y=840 из 1000)
+        # Позиция: СВЕРХУ (y=840)
         bbox = draw.textbbox((0, 0), text, font=font)
         text_width = bbox[2] - bbox[0]
         x = (1000 - text_width) / 2
         y = 840  # Как ты просил
         
-        # Черная обводка (чтобы читалось)
+        # Черная обводка
         for dx in range(-3, 4):
             for dy in range(-3, 4):
                 if dx*dx + dy*dy <= 9:
                     draw.text((x + dx, y + dy), text, font=font, fill="black")
         
-        # Сам текст — белым
+        # Белый текст
         draw.text((x, y), text, font=font, fill="white")
         
         img.save(output_path, quality=95)
