@@ -366,6 +366,36 @@ async def coffee_index_handler(update: Update, context: ContextTypes.DEFAULT_TYP
 
     return ConversationHandler.END
 
+# ==================== INLINE-ОБРАБОТЧИК ====================
+
+async def inline_query_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработчик инлайн-запросов (когда жмут Поделиться)"""
+    query = update.inline_query.query
+    user_id = update.effective_user.id
+    
+    try:
+        photo_file_id = context.bot_data.get('coffee_file_id')
+        
+        if not photo_file_id:
+            await update.inline_query.answer([], cache_time=60)
+            return
+        
+        result = InlineQueryResultCachedPhoto(
+            id="1",
+            photo_file_id=photo_file_id,
+            title="Мой индекс кофе ☕",
+            description="Нажми, чтобы поделиться картинкой с друзьями"
+        )
+        
+        results = [result]
+        await update.inline_query.answer(results, cache_time=10)
+        logger.info(f"✅ Inline-запрос обработан для пользователя {user_id}")
+        
+    except Exception as e:
+        logger.error(f"❌ Ошибка inline-запроса: {e}")
+        logger.exception("Traceback:")
+        await update.inline_query.answer([], cache_time=0)
+        
 async def fix_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     operations = get_user_operations(user_id, limit=5)
@@ -510,38 +540,6 @@ def main():
     application.add_handler(conv_handler_expense)
     application.add_handler(conv_handler_fix)
     application.add_handler(MessageHandler(filters.Regex("^(📈 Статистика|📄 Операции|☕ Индекс кофе|🔙 Главное меню)$"), menu_handler))
-    
-    async def inline_query_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработчик инлайн-запросов (когда жмут Поделиться)"""
-    query = update.inline_query.query
-    user_id = update.effective_user.id
-    
-    try:
-        # Берём сохранённый file_id
-        photo_file_id = context.bot_data.get('coffee_file_id')
-        
-        if not photo_file_id:
-            # Если file_id ещё не получен
-            await update.inline_query.answer([], cache_time=60)
-            return
-        
-        # Создаём результат для отправки
-        result = InlineQueryResultCachedPhoto(
-            id="1",
-            photo_file_id=photo_file_id,
-            title="Мой индекс кофе ☕",
-            description="Нажми, чтобы поделиться картинкой с друзьями"
-        )
-        
-        results = [result]
-        await update.inline_query.answer(results, cache_time=10)
-        logger.info(f"✅ Inline-запрос обработан для пользователя {user_id}")
-        
-    except Exception as e:
-        logger.error(f"❌ Ошибка inline-запроса: {e}")
-        logger.exception("Traceback:")
-        await update.inline_query.answer([], cache_time=0)
-    
     application.add_handler(InlineQueryHandler(inline_query_handler))
 
     logger.info("=" * 50)
