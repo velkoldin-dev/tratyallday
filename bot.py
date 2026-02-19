@@ -546,15 +546,14 @@ def main():
          )
             
     results = [result]
-    await update.inline_query.answer(results, cache_time=10)
-            
-    logger.info(f"✅ Inline-запрос обработан для пользователя {user_id}")
-            
-    except Exception as e:
-            logger.error(f"❌ Ошибка inline-запроса: {e}")
-            logger.exception("Traceback:")
-            results = []
-    await update.inline_query.answer(results, cache_time=0)
+await update.inline_query.answer(results, cache_time=10)
+logger.info(f"✅ Inline-запрос обработан для пользователя {user_id}")
+
+except Exception as e:
+    logger.error(f"❌ Ошибка inline-запроса: {e}")
+    logger.exception("Traceback:")
+    results = []
+    await update.inline_query.answer(results, cache_time=0)  # ← этот внутри except
     
     application.add_handler(InlineQueryHandler(inline_query_handler))
 
