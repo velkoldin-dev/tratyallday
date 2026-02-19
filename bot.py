@@ -46,46 +46,91 @@ def calculate_coffee_index(amount: float) -> dict:
     cups = round(amount / COFFEE_PRICE)
     emoji = get_coffee_emoji(cups)
     return {'cups': cups, 'emoji': emoji, 'amount': amount}
+    
 def generate_coffee_image(date: str, cups: int, emoji: str, output_path: str = "coffee_output.jpg") -> str:
     try:
         template_path = get_random_coffee_template()
         logger.info(f"☕ Используется шаблон: {template_path}")
+        
         img = Image.open(template_path).convert("RGB")
         draw = ImageDraw.Draw(img)
+        
         width, height = img.size
-        title_font_size = int(height * 0.08)
-        cups_font_size = int(height * 0.15)
-        try:
-            title_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", title_font_size)
-            cups_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", cups_font_size)
-        except:
+        
+        # Увеличенные размеры шрифтов
+        title_font_size = int(height * 0.12)  # Было 0.08
+        cups_font_size = int(height * 0.20)   # Было 0.15
+        
+        # Пробуем использовать шрифт с поддержкой кириллицы
+        font_paths = [
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+            "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+            "/System/Library/Fonts/Supplemental/Arial Bold.ttf",
+            "/usr/share/fonts/truetype/msttcorefonts/Arial_Bold.ttf"
+        ]
+        
+        title_font = None
+        cups_font = None
+        
+        for font_path in font_paths:
+            try:
+                title_font = ImageFont.truetype(font_path, title_font_size)
+                cups_font = ImageFont.truetype(font_path, cups_font_size)
+                logger.info(f"✅ Используется шрифт: {font_path}")
+                break
+            except:
+                continue
+        
+        if not title_font:
             title_font = ImageFont.load_default()
             cups_font = ImageFont.load_default()
             logger.warning("⚠️ Используется стандартный шрифт")
+        
         title_text = f"Твои траты за {date}"
         main_text = f"{cups} чашек кофе {emoji}"
-        y_title = height * 0.1
-        y_main = height * 0.4
+        
+        # Позиционирование: верх картинки, 80% ширины
+        y_title = height * 0.08   # 8% от верха
+        y_main = height * 0.20    # 20% от верха
+        
+        max_width = width * 0.80  # 80% ширины
+        
+        # Заголовок с обводкой
         bbox = draw.textbbox((0, 0), title_text, font=title_font)
         text_width = bbox[2] - bbox[0]
         x_title = (width - text_width) / 2
-        for adj in range(-2, 3):
-            for adj_y in range(-2, 3):
-                draw.text((x_title + adj, y_title + adj_y), title_text, font=title_font, fill="black")
+        
+        # Обводка (чёрная тень)
+        outline_width = 3
+        for adj_x in range(-outline_width, outline_width + 1):
+            for adj_y in range(-outline_width, outline_width + 1):
+                draw.text((x_title + adj_x, y_title + adj_y), title_text, font=title_font, fill="black")
+        
+        # Белый текст поверх
         draw.text((x_title, y_title), title_text, font=title_font, fill="white")
+        
+        # Основной текст с обводкой
         bbox = draw.textbbox((0, 0), main_text, font=cups_font)
         text_width = bbox[2] - bbox[0]
         x_main = (width - text_width) / 2
-        for adj in range(-3, 4):
-            for adj_y in range(-3, 4):
-                draw.text((x_main + adj, y_main + adj_y), main_text, font=cups_font, fill="black")
+        
+        outline_width = 4
+        for adj_x in range(-outline_width, outline_width + 1):
+            for adj_y in range(-outline_width, outline_width + 1):
+                draw.text((x_main + adj_x, y_main + adj_y), main_text, font=cups_font, fill="black")
+        
         draw.text((x_main, y_main), main_text, font=cups_font, fill="white")
+        
         img.save(output_path, quality=95)
         logger.info(f"✅ Картинка сгенерирована: {output_path}")
+        
         return output_path
+        
     except Exception as e:
         logger.error(f"❌ Ошибка генерации: {e}")
+        logger.exception("Traceback:")
         raise
+        
 AMOUNT, CATEGORY = range(2)
 FIX_SELECT, FIX_ACTION, FIX_AMOUNT, FIX_CATEGORY = range(2, 6)
 CATEGORIES = [
@@ -455,6 +500,71 @@ def main():
     application.add_handler(MessageHandler(filters.Regex("^(📈 Статистика|📄 Операции|☕ Индекс кофе|🔙 Главное меню)$"), menu_handler))
     
     async def inline_query_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработчик inline-запросов для кнопки Поделиться"""
+    query = update.inline_query.query
+    user_id = update.inline_query.from_user.id
+    
+    # Генерируем индекс кофе для пользователя
+    stats = get_user_stats(user_id, days=1)
+    
+    if not stats['has_data']:
+        # Если нет данных — возвращаем пустой результат
+        results = []
+        await update.inline_query.answer(results, cache_time=0)
+        return
+    
+    try:
+        from telegram import InlineQueryResultPhoto
+        import uuid
+        
+        # Рассчитываем индекс кофе
+        coffee_data = calculate_coffee_index(stats['total'])
+        yesterday = (datetime.now() - timedelta(days=1)).strftime("%d.%m")
+        
+        # Генерируем картинку
+        temp_path = f"coffee_share_{user_id}.jpg"
+        image_path = generate_coffee_image(
+            date=yesterday,
+            cups=coffee_data['cups'],
+            emoji=coffee_data['emoji'],
+            output_path=temp_path
+        )
+        
+        # Загружаем картинку в Telegram
+        with open(image_path, 'rb') as photo:
+            message = await context.bot.send_photo(
+                chat_id=user_id,
+                photo=photo,
+                caption=f"☕ Индекс кофе за {yesterday}"
+            )
+        
+        # Получаем file_id загруженной картинки
+        photo_file_id = message.photo[-1].file_id
+        
+        # Удаляем служебное сообщение
+        await context.bot.delete_message(chat_id=user_id, message_id=message.message_id)
+        
+        # Удаляем временный файл
+        os.remove(image_path)
+        
+        # Создаём результат для inline-режима
+        result = InlineQueryResultPhoto(
+            id=str(uuid.uuid4()),
+            photo_url=f"https://api.telegram.org/file/bot{BOT_TOKEN}/{photo_file_id}",
+            thumbnail_url=f"https://api.telegram.org/file/bot{BOT_TOKEN}/{photo_file_id}",
+            caption=f"☕ Мои траты за {yesterday} = {coffee_data['cups']} чашек кофе {coffee_data['emoji']}\n\n"
+                   f"Слежу за тратами в боте @tratyallday_bot 😊",
+            photo_file_id=photo_file_id
+        )
+        
+        results = [result]
+        await update.inline_query.answer(results, cache_time=10)
+        
+        logger.info(f"✅ Inline-запрос обработан для пользователя {user_id}")
+        
+    except Exception as e:
+        logger.error(f"❌ Ошибка inline-запроса: {e}")
+        logger.exception("Traceback:")
         results = []
         await update.inline_query.answer(results, cache_time=0)
     
