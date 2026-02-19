@@ -499,10 +499,9 @@ def main():
     application.add_handler(conv_handler_fix)
     application.add_handler(MessageHandler(filters.Regex("^(📈 Статистика|📄 Операции|☕ Индекс кофе|🔙 Главное меню)$"), menu_handler))
     
-   def main():
+    def main():
     init_database()
     application = Application.builder().token(BOT_TOKEN).build()
-    ...
     
     async def inline_query_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):  # ← ОТСТУП 4 ПРОБЕЛА
         """Обработчик inline-запросов для кнопки Поделиться"""
