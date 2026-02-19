@@ -534,7 +534,7 @@ def main():
     ]
     
     await update.inline_query.answer(results, cache_time=1)
-            os.remove(image_path)
+    os.remove(image_path)
             
             result = InlineQueryResultPhoto(
                 id=str(uuid.uuid4()),
