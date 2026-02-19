@@ -592,7 +592,11 @@ async def coffee_index_handler(update: Update, context: ContextTypes.DEFAULT_TYP
 
     return ConversationHandler.END
 
-
+async def inline_query_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработчик inline-запросов для кнопки Поделиться"""
+    results = []
+    await update.inline_query.answer(results, cache_time=0)
+    
 # ==================== ДИАЛОГ: ИСПРАВЛЕНИЕ ТРАТ (/fix) ====================
 
 async def fix_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -849,6 +853,14 @@ def main():
     application.add_handler(CommandHandler("testreport", test_report_command))
     application.add_handler(CommandHandler("coffeetest", coffee_test_command))
     
+
+    # ========== ОБРАБОТЧИКИ КНОПОК ==========
+    application.add_handler(MessageHandler(filters.Regex("^📈 Статистика$"), stats_command))
+    application.add_handler(MessageHandler(filters.Regex("^📄 Операции$"), operations_command))
+    application.add_handler(MessageHandler(filters.Regex("^🔧 Редактировать$"), fix_start))
+    application.add_handler(MessageHandler(filters.Regex("^🔙 Главное меню$"), start))
+    application.add_handler(MessageHandler(filters.Regex("^☕ Индекс кофе$"), coffee_index_handler))
+    
     # ========== ДИАЛОГ: ДОБАВЛЕНИЕ ТРАТ ==========
     conv_handler_expense = ConversationHandler(
         entry_points=[
@@ -891,20 +903,13 @@ def main():
     # ========== РЕГИСТРАЦИЯ ОБРАБОТЧИКОВ ==========
     application.add_handler(conv_handler_expense)
     application.add_handler(conv_handler_fix)
-    
+    application.add_handler(InlineQueryHandler(inline_query_handler))
+
     # Обработчик кнопок меню (вне диалогов)
     application.add_handler(MessageHandler(
         filters.Regex("^(📈 Статистика|📄 Операции|☕ Индекс кофе|🔙 Главное меню)$"),
         menu_handler
     ))
-    
-    # ========== INLINE-РЕЖИМ ДЛЯ ШАРИНГА ==========
-    async def inline_query_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Обработчик inline-запросов для кнопки Поделиться"""
-        results = []
-        await update.inline_query.answer(results, cache_time=0)
-    
-    application.add_handler(InlineQueryHandler(inline_query_handler))
     
     # ========== ЗАПУСК БОТА ==========
     logger.info("=" * 50)
