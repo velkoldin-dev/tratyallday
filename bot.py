@@ -53,7 +53,6 @@ def generate_coffee_image(date: str, cups: int, emoji: str, output_path: str = "
         logger.info(f"☕ Используется шаблон: {template_path}")
         
         img = Image.open(template_path).convert("RGB")
-        # Приводим к 1000x1000
         if img.size != (1000, 1000):
             img = img.resize((1000, 1000), Image.Resampling.LANCZOS)
         
@@ -62,42 +61,42 @@ def generate_coffee_image(date: str, cups: int, emoji: str, output_path: str = "
         # Текст одной строкой
         text = f"Мои траты за {date} – это {cups} чашек кофе {emoji}"
         
-        # Шрифты с поддержкой кириллицы (проверенные)
-        font_paths = [
-            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",      # Есть везде
-            "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
-            "/usr/share/fonts/truetype/freefont/FreeSansBold.ttf",
+        # ТОЛЬКО Arial Black (жирный, черный)
+        arial_paths = [
+            "/usr/share/fonts/truetype/msttcorefonts/Arial_Black.ttf",  # Linux
+            "/usr/share/fonts/truetype/msttcorefonts/Arial.ttf",        # запасной Arial
+            "/System/Library/Fonts/Supplemental/Arial Black.ttf",       # macOS
+            "C:\\Windows\\Fonts\\Arialbd.ttf"                           # Windows
         ]
         
         font = None
-        font_size = 45  # Начнем с такого
+        font_size = 42  # Можно будет подогнать
         
-        for font_path in font_paths:
+        for path in arial_paths:
             try:
-                font = ImageFont.truetype(font_path, font_size)
-                logger.info(f"✅ Шрифт загружен: {font_path}")
+                font = ImageFont.truetype(path, font_size)
+                logger.info(f"✅ Arial загружен: {path}")
                 break
             except:
                 continue
         
-        # Если ничего не нашли - используем дефолтный, но с увеличенным размером
         if not font:
-            font = ImageFont.load_default()
-            logger.warning("⚠️ Используется стандартный шрифт")
+            # Если Arial не нашелся — падаем с ошибкой
+            raise Exception("❌ Arial Black не найден на сервере!")
         
-        # Центрируем текст
+        # Позиция: СВЕРХУ (y=840 из 1000)
         bbox = draw.textbbox((0, 0), text, font=font)
         text_width = bbox[2] - bbox[0]
         x = (1000 - text_width) / 2
-        y = 450  # Чуть выше центра
+        y = 840  # Как ты просил
         
-        # Черная обводка (чтоб читалось на любом фоне)
+        # Черная обводка (чтобы читалось)
         for dx in range(-3, 4):
             for dy in range(-3, 4):
                 if dx*dx + dy*dy <= 9:
                     draw.text((x + dx, y + dy), text, font=font, fill="black")
         
-        # Белый текст поверх
+        # Сам текст — белым
         draw.text((x, y), text, font=font, fill="white")
         
         img.save(output_path, quality=95)
