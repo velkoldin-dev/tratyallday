@@ -499,74 +499,69 @@ def main():
     application.add_handler(conv_handler_fix)
     application.add_handler(MessageHandler(filters.Regex("^(📈 Статистика|📄 Операции|☕ Индекс кофе|🔙 Главное меню)$"), menu_handler))
     
-        async def inline_query_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+   def main():
+    init_database()
+    application = Application.builder().token(BOT_TOKEN).build()
+    ...
+    
+    async def inline_query_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):  # ← ОТСТУП 4 ПРОБЕЛА
         """Обработчик inline-запросов для кнопки Поделиться"""
         query = update.inline_query.query
         user_id = update.inline_query.from_user.id
         
-        # Генерируем индекс кофе для пользователя
         stats = get_user_stats(user_id, days=1)
         
         if not stats['has_data']:
-            # Если нет данных — возвращаем пустой результат
             results = []
-        await update.inline_query.answer(results, cache_time=0)
-        return
-    
-    try:
-        from telegram import InlineQueryResultPhoto
-        import uuid
+            await update.inline_query.answer(results, cache_time=0)
+            return
         
-        # Рассчитываем индекс кофе
-        coffee_data = calculate_coffee_index(stats['total'])
-        yesterday = (datetime.now() - timedelta(days=1)).strftime("%d.%m")
-        
-        # Генерируем картинку
-        temp_path = f"coffee_share_{user_id}.jpg"
-        image_path = generate_coffee_image(
-            date=yesterday,
-            cups=coffee_data['cups'],
-            emoji=coffee_data['emoji'],
-            output_path=temp_path
-        )
-        
-        # Загружаем картинку в Telegram
-        with open(image_path, 'rb') as photo:
-            message = await context.bot.send_photo(
-                chat_id=user_id,
-                photo=photo,
-                caption=f"☕ Индекс кофе за {yesterday}"
+        try:
+            from telegram import InlineQueryResultPhoto
+            import uuid
+            
+            coffee_data = calculate_coffee_index(stats['total'])
+            yesterday = (datetime.now() - timedelta(days=1)).strftime("%d.%m")
+            
+            temp_path = f"coffee_share_{user_id}.jpg"
+            image_path = generate_coffee_image(
+                date=yesterday,
+                cups=coffee_data['cups'],
+                emoji=coffee_data['emoji'],
+                output_path=temp_path
             )
-        
-        # Получаем file_id загруженной картинки
-        photo_file_id = message.photo[-1].file_id
-        
-        # Удаляем служебное сообщение
-        await context.bot.delete_message(chat_id=user_id, message_id=message.message_id)
-        
-        # Удаляем временный файл
-        os.remove(image_path)
-        
-        # Создаём результат для inline-режима
-        result = InlineQueryResultPhoto(
-            id=str(uuid.uuid4()),
-            photo_url=f"https://api.telegram.org/file/bot{BOT_TOKEN}/{photo_file_id}",
-            thumbnail_url=f"https://api.telegram.org/file/bot{BOT_TOKEN}/{photo_file_id}",
-            caption=f"☕ Мои траты за {yesterday} = {coffee_data['cups']} чашек кофе {coffee_data['emoji']}\n\n"
-                   f"Слежу за тратами в боте @tratyallday_bot 😊",
-            photo_file_id=photo_file_id
-        )
-        
-        results = [result]
-        await update.inline_query.answer(results, cache_time=10)
-        
-        logger.info(f"✅ Inline-запрос обработан для пользователя {user_id}")
-        
-    except Exception as e:
-        logger.error(f"❌ Ошибка inline-запроса: {e}")
-        logger.exception("Traceback:")
-        results = []
-        await update.inline_query.answer(results, cache_time=0)
+            
+            with open(image_path, 'rb') as photo:
+                message = await context.bot.send_photo(
+                    chat_id=user_id,
+                    photo=photo,
+                    caption=f"☕ Индекс кофе за {yesterday}"
+                )
+            
+            photo_file_id = message.photo[-1].file_id
+            
+            await context.bot.delete_message(chat_id=user_id, message_id=message.message_id)
+            os.remove(image_path)
+            
+            result = InlineQueryResultPhoto(
+                id=str(uuid.uuid4()),
+                photo_url=f"https://api.telegram.org/file/bot{BOT_TOKEN}/{photo_file_id}",
+                thumbnail_url=f"https://api.telegram.org/file/bot{BOT_TOKEN}/{photo_file_id}",
+                caption=f"☕ Мои траты за {yesterday} = {coffee_data['cups']} чашек кофе {coffee_data['emoji']}\n\n"
+                       f"Слежу за тратами в боте @tratyallday_bot 😊",
+                photo_file_id=photo_file_id
+            )
+            
+            results = [result]
+            await update.inline_query.answer(results, cache_time=10)
+            
+            logger.info(f"✅ Inline-запрос обработан для пользователя {user_id}")
+            
+        except Exception as e:
+            logger.error(f"❌ Ошибка inline-запроса: {e}")
+            logger.exception("Traceback:")
+            results = []
+            await update.inline_query.answer(results, cache_time=0)
     
     application.add_handler(InlineQueryHandler(inline_query_handler))
     
