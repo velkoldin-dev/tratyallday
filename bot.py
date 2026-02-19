@@ -61,35 +61,18 @@ def generate_coffee_image(date: str, cups: int, emoji: str, output_path: str = "
         # Текст одной строкой
         text = f"Мои траты за {date} – это {cups} чашек кофе {emoji}"
         
-        # Шрифты, которые ЕСТЬ НА ВСЕХ Linux-серверах
-        font_paths = [
-            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",      # Есть везде
-            "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
-            "/usr/share/fonts/truetype/liberation2/LiberationSans-Bold.ttf",
-            "/usr/share/fonts/truetype/noto/NotoSans-Bold.ttf",
-        ]
+        # 👇 ШРИФТ ИЗ GIT-репозитория
+        font_path = os.path.join(os.path.dirname(__file__), "fonts", "Arial_Black.ttf")
         
-        font = None
-        font_size = 45  # Можно регулировать
-        
-        for path in font_paths:
-            try:
-                font = ImageFont.truetype(path, font_size)
-                logger.info(f"✅ Шрифт загружен: {path}")
-                break
-            except:
-                continue
-        
-        # Если ничего не нашли — используем встроенный, но это риск
-        if not font:
-            font = ImageFont.load_default()
-            logger.warning("⚠️ Используется стандартный шрифт (может не быть кириллицы)")
+        font_size = 42
+        font = ImageFont.truetype(font_path, font_size)
+        logger.info(f"✅ Arial Black загружен из репозитория")
         
         # Позиция: СВЕРХУ (y=840)
         bbox = draw.textbbox((0, 0), text, font=font)
         text_width = bbox[2] - bbox[0]
         x = (1000 - text_width) / 2
-        y = 840  # Как ты просил
+        y = 840
         
         # Черная обводка
         for dx in range(-3, 4):
