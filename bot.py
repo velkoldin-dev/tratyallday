@@ -548,7 +548,7 @@ def main():
     results = [result]
     await update.inline_query.answer(results, cache_time=10)
             
-            logger.info(f"✅ Inline-запрос обработан для пользователя {user_id}")
+    logger.info(f"✅ Inline-запрос обработан для пользователя {user_id}")
             
     except Exception as e:
             logger.error(f"❌ Ошибка inline-запроса: {e}")
