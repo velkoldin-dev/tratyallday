@@ -535,6 +535,8 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def coffee_index_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик кнопки 'Индекс кофе'"""
+    logger.info("🔥🔥🔥 КНОПКА КОФЕ НАЖАТА! 🔥🔥🔥")
+    logger.info(f"Пользователь: {update.effective_user.id}")
     user_id = update.effective_user.id
 
     stats = get_user_stats(user_id, days=1)
