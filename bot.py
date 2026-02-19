@@ -53,84 +53,60 @@ def generate_coffee_image(date: str, cups: int, emoji: str, output_path: str = "
         logger.info(f"☕ Используется шаблон: {template_path}")
         
         img = Image.open(template_path).convert("RGB")
+        # Приводим к 1000x1000
+        if img.size != (1000, 1000):
+            img = img.resize((1000, 1000), Image.Resampling.LANCZOS)
+        
         draw = ImageDraw.Draw(img)
         
-        width, height = img.size
+        # Текст одной строкой
+        text = f"Мои траты за {date} – это {cups} чашек кофе {emoji}"
         
-        # Размеры шрифтов (увеличены)
-        title_font_size = int(height * 0.10)
-        cups_font_size = int(height * 0.18)
-        
-        # Список шрифтов (поддержка кириллицы)
+        # Шрифты с поддержкой кириллицы (проверенные)
         font_paths = [
-            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",      # Есть везде
             "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
             "/usr/share/fonts/truetype/freefont/FreeSansBold.ttf",
-            "/System/Library/Fonts/Supplemental/Arial Bold.ttf"
         ]
         
-        title_font = None
-        cups_font = None
+        font = None
+        font_size = 45  # Начнем с такого
         
         for font_path in font_paths:
             try:
-                title_font = ImageFont.truetype(font_path, title_font_size)
-                cups_font = ImageFont.truetype(font_path, cups_font_size)
-                logger.info(f"✅ Шрифт: {font_path}")
+                font = ImageFont.truetype(font_path, font_size)
+                logger.info(f"✅ Шрифт загружен: {font_path}")
                 break
             except:
                 continue
         
-        if not title_font:
-            title_font = ImageFont.load_default()
-            cups_font = ImageFont.load_default()
-            logger.warning("⚠️ Стандартный шрифт")
+        # Если ничего не нашли - используем дефолтный, но с увеличенным размером
+        if not font:
+            font = ImageFont.load_default()
+            logger.warning("⚠️ Используется стандартный шрифт")
         
-        # КОРОТКИЙ ТЕКСТ (одна строка)
-        title_text = f"Траты {date}"
-        main_text = f"{cups} чашек кофе {emoji}"
-        
-        # Позиции
-        y_title = height * 0.10
-        y_main = height * 0.25
-        
-        # Рисуем заголовок
-        bbox = draw.textbbox((0, 0), title_text, font=title_font)
+        # Центрируем текст
+        bbox = draw.textbbox((0, 0), text, font=font)
         text_width = bbox[2] - bbox[0]
-        x_title = (width - text_width) / 2
+        x = (1000 - text_width) / 2
+        y = 450  # Чуть выше центра
         
-        # Обводка (чёрная)
-        outline = 4
-        for dx in range(-outline, outline + 1):
-            for dy in range(-outline, outline + 1):
-                if dx*dx + dy*dy <= outline*outline:
-                    draw.text((x_title + dx, y_title + dy), title_text, font=title_font, fill="black")
+        # Черная обводка (чтоб читалось на любом фоне)
+        for dx in range(-3, 4):
+            for dy in range(-3, 4):
+                if dx*dx + dy*dy <= 9:
+                    draw.text((x + dx, y + dy), text, font=font, fill="black")
         
-        # Белый текст
-        draw.text((x_title, y_title), title_text, font=title_font, fill="white")
-        
-        # Рисуем основной текст
-        bbox = draw.textbbox((0, 0), main_text, font=cups_font)
-        text_width = bbox[2] - bbox[0]
-        x_main = (width - text_width) / 2
-        
-        # Обводка
-        outline = 5
-        for dx in range(-outline, outline + 1):
-            for dy in range(-outline, outline + 1):
-                if dx*dx + dy*dy <= outline*outline:
-                    draw.text((x_main + dx, y_main + dy), main_text, font=cups_font, fill="black")
-        
-        # Белый текст
-        draw.text((x_main, y_main), main_text, font=cups_font, fill="white")
+        # Белый текст поверх
+        draw.text((x, y), text, font=font, fill="white")
         
         img.save(output_path, quality=95)
-        logger.info(f"✅ Картинка сгенерирована: {output_path}")
+        logger.info(f"✅ Картинка готова: {output_path}")
         
         return output_path
         
     except Exception as e:
-        logger.error(f"❌ Ошибка генерации: {e}")
+        logger.error(f"❌ Ошибка: {e}")
         logger.exception("Traceback:")
         raise
         
