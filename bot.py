@@ -77,6 +77,69 @@ def get_main_menu():
     ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
+async def coffee_test_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Тестовая команда для индекса кофе"""
+    user_id = update.effective_user.id
+    
+    # Берём статистику за сегодня (0 дней)
+    stats = get_user_stats(user_id, days=0)
+    
+    if not stats['has_data']:
+        await update.message.reply_text(
+            "☕ Нет трат за сегодня! Добавь траты сначала.",
+            reply_markup=get_main_menu()
+        )
+        return
+    
+    try:
+        from coffee_index import calculate_coffee_index, generate_coffee_image
+        from datetime import datetime
+        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+        
+        # Рассчитываем индекс кофе
+        coffee_data = calculate_coffee_index(stats['total'])
+        
+        await update.message.reply_text("⏳ Готовлю индекс кофе...")
+        
+        # Генерируем картинку
+        today = datetime.now().strftime("%d.%m")
+        
+        image_path = generate_coffee_image(
+            date=today,
+            cups=coffee_data['cups'],
+            emoji=coffee_data['emoji']
+        )
+        
+        # Отправляем картинку
+        share_button = InlineKeyboardButton(
+            "📤 Поделиться",
+            switch_inline_query=f"Слежу за тратами в боте @tratyallday_bot и вот что он мне рассказал 😄"
+        )
+        inline_keyboard = InlineKeyboardMarkup([[share_button]])
+        
+        with open(image_path, 'rb') as photo:
+            await update.message.reply_photo(
+                photo=photo,
+                caption=f"☕ Твои траты за {today} = {coffee_data['cups']} чашек кофе {coffee_data['emoji']}",
+                reply_markup=inline_keyboard
+            )
+        
+        await update.message.reply_text(
+            "Выбери действие:",
+            reply_markup=get_main_menu()
+        )
+        
+        os.remove(image_path)
+        logger.info(f"✅ Тестовый индекс кофе отправлен")
+        
+    except Exception as e:
+        logger.error(f"❌ Ошибка генерации индекса кофе: {e}")
+        logger.exception("Traceback:")
+        await update.message.reply_text(
+            f"❌ Ошибка: {str(e)}",
+            reply_markup=get_main_menu()
+        )
+
 # ==================== ЕЖЕДНЕВНЫЙ ОТЧЁТ ====================
 async def send_daily_report(context: ContextTypes.DEFAULT_TYPE):
     """Отправляет ежедневный отчёт всем пользователям в 9:00 МСК"""
@@ -678,6 +741,7 @@ def main():
     application.add_handler(CommandHandler("myid", myid_command))
     application.add_handler(CommandHandler("users", users_command))
     application.add_handler(CommandHandler("testreport", test_report_command))
+    application.add_handler(CommandHandler("coffeetest", coffee_test_command))
     
     # ========== ДИАЛОГ: ДОБАВЛЕНИЕ ТРАТ ==========
     conv_handler_expense = ConversationHandler(
