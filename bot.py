@@ -57,16 +57,16 @@ def generate_coffee_image(date: str, cups: int, emoji: str, output_path: str = "
         
         width, height = img.size
         
-        # Увеличенные размеры шрифтов
-        title_font_size = int(height * 0.12)  # Было 0.08
-        cups_font_size = int(height * 0.20)   # Было 0.15
+        # Размеры шрифтов (увеличены)
+        title_font_size = int(height * 0.10)
+        cups_font_size = int(height * 0.18)
         
-        # Пробуем использовать шрифт с поддержкой кириллицы
+        # Список шрифтов (поддержка кириллицы)
         font_paths = [
             "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
             "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
-            "/System/Library/Fonts/Supplemental/Arial Bold.ttf",
-            "/usr/share/fonts/truetype/msttcorefonts/Arial_Bold.ttf"
+            "/usr/share/fonts/truetype/freefont/FreeSansBold.ttf",
+            "/System/Library/Fonts/Supplemental/Arial Bold.ttf"
         ]
         
         title_font = None
@@ -76,7 +76,7 @@ def generate_coffee_image(date: str, cups: int, emoji: str, output_path: str = "
             try:
                 title_font = ImageFont.truetype(font_path, title_font_size)
                 cups_font = ImageFont.truetype(font_path, cups_font_size)
-                logger.info(f"✅ Используется шрифт: {font_path}")
+                logger.info(f"✅ Шрифт: {font_path}")
                 break
             except:
                 continue
@@ -84,41 +84,44 @@ def generate_coffee_image(date: str, cups: int, emoji: str, output_path: str = "
         if not title_font:
             title_font = ImageFont.load_default()
             cups_font = ImageFont.load_default()
-            logger.warning("⚠️ Используется стандартный шрифт")
+            logger.warning("⚠️ Стандартный шрифт")
         
-        title_text = f"Твои траты за {date}"
+        # КОРОТКИЙ ТЕКСТ (одна строка)
+        title_text = f"Траты {date}"
         main_text = f"{cups} чашек кофе {emoji}"
         
-        # Позиционирование: верх картинки, 80% ширины
-        y_title = height * 0.08   # 8% от верха
-        y_main = height * 0.20    # 20% от верха
+        # Позиции
+        y_title = height * 0.10
+        y_main = height * 0.25
         
-        max_width = width * 0.80  # 80% ширины
-        
-        # Заголовок с обводкой
+        # Рисуем заголовок
         bbox = draw.textbbox((0, 0), title_text, font=title_font)
         text_width = bbox[2] - bbox[0]
         x_title = (width - text_width) / 2
         
-        # Обводка (чёрная тень)
-        outline_width = 3
-        for adj_x in range(-outline_width, outline_width + 1):
-            for adj_y in range(-outline_width, outline_width + 1):
-                draw.text((x_title + adj_x, y_title + adj_y), title_text, font=title_font, fill="black")
+        # Обводка (чёрная)
+        outline = 4
+        for dx in range(-outline, outline + 1):
+            for dy in range(-outline, outline + 1):
+                if dx*dx + dy*dy <= outline*outline:
+                    draw.text((x_title + dx, y_title + dy), title_text, font=title_font, fill="black")
         
-        # Белый текст поверх
+        # Белый текст
         draw.text((x_title, y_title), title_text, font=title_font, fill="white")
         
-        # Основной текст с обводкой
+        # Рисуем основной текст
         bbox = draw.textbbox((0, 0), main_text, font=cups_font)
         text_width = bbox[2] - bbox[0]
         x_main = (width - text_width) / 2
         
-        outline_width = 4
-        for adj_x in range(-outline_width, outline_width + 1):
-            for adj_y in range(-outline_width, outline_width + 1):
-                draw.text((x_main + adj_x, y_main + adj_y), main_text, font=cups_font, fill="black")
+        # Обводка
+        outline = 5
+        for dx in range(-outline, outline + 1):
+            for dy in range(-outline, outline + 1):
+                if dx*dx + dy*dy <= outline*outline:
+                    draw.text((x_main + dx, y_main + dy), main_text, font=cups_font, fill="black")
         
+        # Белый текст
         draw.text((x_main, y_main), main_text, font=cups_font, fill="white")
         
         img.save(output_path, quality=95)
