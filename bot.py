@@ -512,48 +512,35 @@ def main():
     application.add_handler(MessageHandler(filters.Regex("^(📈 Статистика|📄 Операции|☕ Индекс кофе|🔙 Главное меню)$"), menu_handler))
     
     async def inline_query_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Обработчик инлайн-запросов (когда жмут Поделиться)"""
-        query = update.inline_query.query
+    """Обработчик инлайн-запросов (когда жмут Поделиться)"""
+    query = update.inline_query.query
+    user_id = update.effective_user.id
     
-    # Берём сохранённый file_id
-    photo_file_id = context.bot_data.get('coffee_file_id')
-    
-    if not photo_file_id:
-        # Если file_id ещё не получен
-        await update.inline_query.answer([], cache_time=60)
-        return
-    
-    # Создаём результат для отправки
-    results = [
-        InlineQueryResultCachedPhoto(
+    try:
+        # Берём сохранённый file_id
+        photo_file_id = context.bot_data.get('coffee_file_id')
+        
+        if not photo_file_id:
+            # Если file_id ещё не получен
+            await update.inline_query.answer([], cache_time=60)
+            return
+        
+        # Создаём результат для отправки
+        result = InlineQueryResultCachedPhoto(
             id="1",
             photo_file_id=photo_file_id,
             title="Мой индекс кофе ☕",
             description="Нажми, чтобы поделиться картинкой с друзьями"
         )
-    ]
-    
-    await update.inline_query.answer(results, cache_time=1)
-    os.remove(image_path)
-            
-    result = InlineQueryResultPhoto(
-            id=str(uuid.uuid4()),
-            photo_url=f"https://api.telegram.org/file/bot{BOT_TOKEN}/{photo_file_id}",
-            thumbnail_url=f"https://api.telegram.org/file/bot{BOT_TOKEN}/{photo_file_id}",
-            caption=f"☕ Мои траты за {yesterday} = {coffee_data['cups']} чашек кофе {coffee_data['emoji']}\n\n"
-                    f"Слежу за тратами в боте @tratyallday_bot 😊",
-            photo_file_id=photo_file_id
-         )
-            
-    results = [result]
-await update.inline_query.answer(results, cache_time=10)
-logger.info(f"✅ Inline-запрос обработан для пользователя {user_id}")
-
-except Exception as e:
-    logger.error(f"❌ Ошибка inline-запроса: {e}")
-    logger.exception("Traceback:")
-    results = []
-    await update.inline_query.answer(results, cache_time=0)  # ← этот внутри except
+        
+        results = [result]
+        await update.inline_query.answer(results, cache_time=10)
+        logger.info(f"✅ Inline-запрос обработан для пользователя {user_id}")
+        
+    except Exception as e:
+        logger.error(f"❌ Ошибка inline-запроса: {e}")
+        logger.exception("Traceback:")
+        await update.inline_query.answer([], cache_time=0)
     
     application.add_handler(InlineQueryHandler(inline_query_handler))
 
