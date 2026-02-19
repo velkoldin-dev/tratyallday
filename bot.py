@@ -294,26 +294,76 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.clear()
     return ConversationHandler.END
 async def coffee_index_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработчик кнопки 'Индекс кофе'"""
     user_id = update.effective_user.id
     stats = get_user_stats(user_id, days=1)
+
     if not stats['has_data']:
-        await update.message.reply_text("☕ У тебя не было трат вчера, поэтому индекс кофе равен 0!", reply_markup=get_main_menu())
+        await update.message.reply_text(
+            "☕ У тебя не было трат вчера, поэтому индекс кофе равен 0!",
+            reply_markup=get_main_menu()
+        )
         return ConversationHandler.END
+
     try:
         coffee_data = calculate_coffee_index(stats['total'])
-        await update.message.reply_text("⏳ Готовлю индекс кофе...", reply_markup=ReplyKeyboardRemove())
         yesterday = (datetime.now() - timedelta(days=1)).strftime("%d.%m")
-        image_path = generate_coffee_image(date=yesterday, cups=coffee_data['cups'], emoji=coffee_data['emoji'])
-        share_button = InlineKeyboardButton("📤 Поделиться", switch_inline_query="Слежу за тратами в боте @tratyallday_bot и вот что он мне рассказал 😄")
-        inline_keyboard = InlineKeyboardMarkup([[share_button]])
+
+        # Генерируем картинку
+        image_path = generate_coffee_image(
+            date=yesterday,
+            cups=coffee_data['cups'],
+            emoji=coffee_data['emoji']
+        )
+
+        # 👇 БЛОК ДЛЯ КАНАЛА (получение file_id)
+        CHANNEL_ID = -1001234567890  # ЗАМЕНИ НА СВОЙ ID КАНАЛА
+        
+        # Открываем файл и отправляем в канал
         with open(image_path, 'rb') as photo:
-            await update.message.reply_photo(photo=photo, caption=f"☕ Твои траты за {yesterday} = {coffee_data['cups']} чашек кофе {coffee_data['emoji']}", reply_markup=inline_keyboard)
-        await update.message.reply_text("Выбери действие:", reply_markup=get_main_menu())
+            channel_message = await context.bot.send_photo(
+                chat_id=CHANNEL_ID,
+                photo=photo
+            )
+        
+        # Получаем file_id (последняя версия фото — самая большая)
+        photo_file_id = channel_message.photo[-1].file_id
+        logger.info(f"✅ Получен file_id для канала: {photo_file_id}")
+        
+        # Можно сохранить в context.bot_data или в БД
+        context.bot_data['coffee_file_id'] = photo_file_id
+        # 👆 КОНЕЦ БЛОКА
+
+        # Кнопка для инлайн-шеринга (используем file_id)
+        share_button = InlineKeyboardButton(
+            "📤 Поделиться",
+            switch_inline_query=""
+        )
+        inline_keyboard = InlineKeyboardMarkup([[share_button]])
+
+        # Отправляем пользователю
+        with open(image_path, 'rb') as photo:
+            await update.message.reply_photo(
+                photo=photo,
+                caption=f"☕ Твои траты за {yesterday} = {coffee_data['cups']} чашек кофе {coffee_data['emoji']}",
+                reply_markup=inline_keyboard
+            )
+
+        await update.message.reply_text(
+            "Выбери действие:",
+            reply_markup=get_main_menu()
+        )
+
+        # Удаляем временный файл
         os.remove(image_path)
-        logger.info(f"✅ Индекс кофе отправлен пользователю {user_id}")
+
     except Exception as e:
         logger.error(f"❌ Ошибка генерации индекса кофе: {e}")
-        await update.message.reply_text("❌ Ошибка генерации. Попробуй позже!", reply_markup=get_main_menu())
+        await update.message.reply_text(
+            "❌ Ошибка генерации. Попробуй позже!",
+            reply_markup=get_main_menu()
+        )
+
     return ConversationHandler.END
 
 async def fix_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -461,43 +511,29 @@ def main():
     application.add_handler(conv_handler_fix)
     application.add_handler(MessageHandler(filters.Regex("^(📈 Статистика|📄 Операции|☕ Индекс кофе|🔙 Главное меню)$"), menu_handler))
     
-    async def inline_query_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):  # ← ОТСТУП 4 ПРОБЕЛА
-        """Обработчик inline-запросов для кнопки Поделиться"""
-        query = update.inline_query.query
-        user_id = update.inline_query.from_user.id
-        
-        stats = get_user_stats(user_id, days=1)
-        
-        if not stats['has_data']:
-            results = []
-            await update.inline_query.answer(results, cache_time=0)
-            return
-        
-        try:
-            from telegram import InlineQueryResultPhoto
-            import uuid
-            
-            coffee_data = calculate_coffee_index(stats['total'])
-            yesterday = (datetime.now() - timedelta(days=1)).strftime("%d.%m")
-            
-            temp_path = f"coffee_share_{user_id}.jpg"
-            image_path = generate_coffee_image(
-                date=yesterday,
-                cups=coffee_data['cups'],
-                emoji=coffee_data['emoji'],
-                output_path=temp_path
-            )
-            
-            with open(image_path, 'rb') as photo:
-                message = await context.bot.send_photo(
-                    chat_id=user_id,
-                    photo=photo,
-                    caption=f"☕ Индекс кофе за {yesterday}"
-                )
-            
-            photo_file_id = message.photo[-1].file_id
-            
-            await context.bot.delete_message(chat_id=user_id, message_id=message.message_id)
+    async def inline_query_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработчик инлайн-запросов (когда жмут Поделиться)"""
+    query = update.inline_query.query
+    
+    # Берём сохранённый file_id
+    photo_file_id = context.bot_data.get('coffee_file_id')
+    
+    if not photo_file_id:
+        # Если file_id ещё не получен
+        await update.inline_query.answer([], cache_time=60)
+        return
+    
+    # Создаём результат для отправки
+    results = [
+        InlineQueryResultCachedPhoto(
+            id="1",
+            photo_file_id=photo_file_id,
+            title="Мой индекс кофе ☕",
+            description="Нажми, чтобы поделиться картинкой с друзьями"
+        )
+    ]
+    
+    await update.inline_query.answer(results, cache_time=1)
             os.remove(image_path)
             
             result = InlineQueryResultPhoto(
@@ -521,7 +557,7 @@ def main():
             await update.inline_query.answer(results, cache_time=0)
     
     application.add_handler(InlineQueryHandler(inline_query_handler))
-    
+
     logger.info("=" * 50)
     logger.info("🤖 Бот учета трат запущен! v2.1 COFFEE UPDATE")
     logger.info("⏰ Ежедневные отчеты: 9:00 по Москве")
