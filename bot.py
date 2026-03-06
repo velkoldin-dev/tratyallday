@@ -104,9 +104,10 @@ def get_moscow_time():
     from datetime import timezone
     return datetime.now(timezone.utc) + timedelta(hours=TIMEZONE_OFFSET)
 def format_date(dt=None):
+    """Форматирует дату в ГГГГ-ММ-ДД для БД"""
     if dt is None:
         dt = get_moscow_time()
-    return dt.strftime("%d.%m")
+    return dt.strftime("%Y-%m-%d")
 def clean_category(category: str) -> str:
     return category.split(' ', 1)[1] if ' ' in category else category
 def get_main_menu():
