@@ -105,7 +105,8 @@ def get_user_stats(user_id, days=1):
     cursor = conn.cursor()
     
     from datetime import datetime, timedelta
-    target_date = (datetime.now() - timedelta(days=days)).strftime("%d.%m")
+    # 👇 ИЗМЕНЕНО: теперь дата в формате ISO
+    target_date = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
     
     cursor.execute('''
         SELECT category, SUM(amount) as total
